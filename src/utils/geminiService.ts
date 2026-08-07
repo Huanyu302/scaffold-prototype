@@ -417,21 +417,20 @@ CRITICAL RULES FOR EXECUTIVE OVERVIEW:
 4. GLOBAL SUMMARY LIMIT: The "globalSummary" MUST be strictly restricted to max 50 English words or 2 sentences. Only name the strongest (Strength) and weakest (Vulnerability) dimensions. Never include any detailed, micro-level revision or edit guidelines.
 5. STRICT KEYPOINT TITLE LIMIT (MAX 5 WORDS): The title of each extracted keypoint in coreKeyPoints MUST be strictly at most 5 words (1 to 5 words maximum, e.g. "Methodological Query Specification", "Thematic Literature Synthesis"). Never exceed 5 words under any circumstances.
 
-SEVERITY CLASSIFICATION RULES (NATURAL ACADEMIC SENTIMENT):
+SEVERITY CLASSIFICATION & TOP-TO-BOTTOM ORDERING RULES:
 The frontend UI maps severity as follows:
 - 'minor' -> Displayed as "ON TRACK" (Green label, indicating work ALREADY accomplished well).
-- 'moderate' -> Displayed as "SUGGESTION" (Yellow label, indicating standard edits/critiques/suggestions).
+- 'moderate' -> Displayed as "SUGGESTION" (Yellow label, indicating standard edits/critiques/suggestions/questions).
 - 'critical' -> Displayed as "FOCUS" (Red label, indicating high-priority warnings or critical gaps).
 
-STRICT CLASSIFICATION MANDATE:
-1. 'minor' (ON TRACK / PRAISE):
-   Assign 'minor' to sentences that praise or affirm what the student has ALREADY done well (e.g. "done a strong contextual analysis", "clearly scoped", "well-framed direction", "good stakeholder breakdown").
-   Even if the sentence contains topic nouns like "safety needs" or "frictions", if the sentence commends the student's work without asking for changes, classify it as 'minor'!
-
-2. 'moderate' (SUGGESTION / EDIT REQUIRED):
-   Assign 'moderate' to sentences that request action or point out limitations/flaws in the student's work (e.g. "you need to articulate...", "reads more like a generic step", "should be expanded", "is missing detail").
-
-3. 'critical' (FOCUS / HIGH-PRIORITY WARNING):
+STRICT ORDERING & CLASSIFICATION MANDATE:
+1. STRICT TOP-TO-BOTTOM DOCUMENT ORDERING: The coreKeyPoints array MUST be ordered strictly by the exact sequential order of appearance of their sourceExcerpts in the raw feedback text from top to bottom. NEVER put 'minor' (On Track) items at the bottom unless they physically appear at the bottom of the document!
+2. 'minor' (ON TRACK / PRAISE ONLY):
+   Assign 'minor' STRICTLY AND ONLY to sentences that praise or affirm what the student has ALREADY done well (e.g. "done a strong contextual analysis", "clearly scoped", "well-framed direction", "good stakeholder breakdown", "ToC is well developed", "good comparison rationale").
+   NEVER assign 'minor' (On Track) to sentences that contain questions, suggestions, or request further detail/explanation!
+3. 'moderate' (SUGGESTION / QUESTIONS / EDIT REQUIRED):
+   Assign 'moderate' to any sentences that raise questions (containing "?", e.g. "how will you measure...", "would you be able to..."), request action or clarification (e.g. "clarify whether...", "consider adding...", "requires further explanation", "you need to articulate...", "should be expanded", "specify..."), or point out missing analysis/gaps/issues!
+4. 'critical' (FOCUS / HIGH-PRIORITY WARNING):
    Assign 'critical' to major missing components, severe methodology flaws, or urgent rubric violations.
 `;
 
@@ -670,43 +669,52 @@ function determineAssociatedCriterion(sentence: string, handbookText?: string): 
 export function sanitizeKeyPointSeverities(keyPoints: ParsedKeyPoint[]) {
   if (!Array.isArray(keyPoints)) return;
 
-  // 1. Title-level Explicit Praise & Critique Modifiers
-  const titlePraiseRegex = /^(strong|good|robust|well[-\s]|clear|excellent|insightful|solid|effective|exceptional|commendable|thorough)\b/i;
-  const titleCritiqueRegex = /^(missing|generic|unclear|vague|lack|lacks|unexplained|inconsistent|incomplete|define|specify|integrate|reconcile|address|improve)\b/i;
+  // 1. Title-level Critique / Issue / Gap Keywords anywhere in the title
+  const titleCritiqueRegex = /\b(missing|generic|unclear|vague|lack|lacks|unexplained|inconsistent|incomplete|define|specify|integrate|reconcile|address|improve|issue|issues|gap|gaps|problem|problems|challenge|challenges|question|questions|query|queries|risk|risks|concern|concerns|required|needed|needs|uncertainty|uncertainties|flaw|flaws|limitation|limitations|bias|error|errors|weakness|weaknesses)\b/i;
 
-  // 2. Sentence Excerpt Level Sentiment Rules
-  const explicitNegativeEvaluationRegex = /\b(generic\s+implementation|reads?\s+more\s+like|is\s+missing|are\s+missing|is\s+lacking|lacks\s+|is\s+unclear|failed?\s+to|omitted|omits|is\s+vague|superficial|insufficient|unexplained|without\s+definition|without\s+explanation|rather\s+than\s+a\s+fully)\b/i;
-  const studentActionDirectiveRegex = /\b(you\s+need\s+to|needs?\s+to\s+be|you\s+should|should\s+be|must\s+be|be\s+sure\s+to|please\s+add|make\s+sure\s+to|you\s+must)\b/i;
-  const positivePraiseRegex = /\b(done\s+a\s+strong|well[-\s]framed|well[-\s]defined|well[-\s]structured|clearly\s+scoped|strong\s+contextual|excellent|outstanding|good\s+job|robust|strong\s+analysis|insightful|exceptional|commendable|thoroughly|solid|praised|effective|great\s+progress)\b/i;
+  // 2. Title-level Praise Modifiers at start of title
+  const titlePraiseRegex = /^(strong|good|robust|well[-\s]|clear|excellent|insightful|solid|effective|exceptional|commendable|thorough)\b/i;
+
+  // 3. Excerpt Level Question, Directive, Action, or Critique Indicators
+  const critiqueOrQuestionRegex = /\?|\b(you\s+need\s+to|needs?\s+to\s+be|you\s+should|should\s+be|must\s+be|be\s+sure\s+to|please\s+add|make\s+sure\s+to|you\s+must|clarify|consider|address|explain|elaborate|specify|improve|refine|modify|adjust|further|additional|add|expand|detail|details|unclear|vague|missing|lack|lacks|insufficient|not\s+clear|not\s+explicit|not\s+fully|rather\s+than|requires?|needed|needed\s+to|how\s+will|would\s+you|would\s+the|whether|how\s+to)\b/i;
+
+  // 4. Excerpt Level Positive Praise
+  const positivePraiseRegex = /\b(done\s+a\s+strong|well[-\s]framed|well[-\s]defined|well[-\s]structured|clearly\s+scoped|strong\s+contextual|excellent|outstanding|good\s+job|robust|strong\s+analysis|insightful|exceptional|commendable|thoroughly|solid|praised|effective|great\s+progress|is\s+good\s+to\s+see|good\s+rationale|well\s+developed)\b/i;
 
   keyPoints.forEach(kp => {
     const title = (kp.title || '').trim();
     const excerpt = (kp.sourceExcerpt || '').trim();
     const text = `${title} ${excerpt}`;
 
-    // RULE 1: TITLE-LEVEL DUAL GUARANTEE
-    // If the extracted briefing title itself starts with a praise modifier (e.g. "Strong Stakeholder Analysis"), it MUST be 'minor' (On Track)!
-    if (titlePraiseRegex.test(title) && !titleCritiqueRegex.test(title)) {
-      kp.severity = 'minor'; // On Track!
-      return;
-    }
-
-    // If the extracted briefing title itself starts with a critique/action modifier (e.g. "Missing Battery Safety Features", "Generic Implementation"), it CANNOT be 'minor' (On Track)!
+    // RULE 1: If title contains ANY critique / gap / issue / question word, it CANNOT be 'minor' (On Track)!
     if (titleCritiqueRegex.test(title)) {
       if (kp.severity === 'minor') {
-        kp.severity = 'moderate'; // Suggestion!
+        kp.severity = 'moderate'; // Downgrade from On Track to Suggestion!
       }
       return;
     }
 
-    // RULE 2: EXCERPT-LEVEL SENTIMENT CLASSIFICATION (For neutral titles)
-    const hasNegativeEval = explicitNegativeEvaluationRegex.test(text);
-    const hasActionDirective = studentActionDirectiveRegex.test(text);
-    const hasPositivePraise = positivePraiseRegex.test(text);
+    // RULE 2: If excerpt contains question mark '?' or action directive / critique / question phrase, it CANNOT be 'minor' (On Track)!
+    if (critiqueOrQuestionRegex.test(excerpt) || critiqueOrQuestionRegex.test(text)) {
+      if (kp.severity === 'minor') {
+        kp.severity = 'moderate'; // Downgrade from On Track to Suggestion!
+      }
+      return;
+    }
 
-    if (hasPositivePraise && !hasNegativeEval && !hasActionDirective) {
+    // RULE 3: If title starts with praise AND has no critique words in title/excerpt, set to 'minor' (On Track)
+    if (titlePraiseRegex.test(title) && !titleCritiqueRegex.test(text) && !critiqueOrQuestionRegex.test(text)) {
       kp.severity = 'minor'; // On Track!
-    } else if (kp.severity === 'minor' && (hasNegativeEval || hasActionDirective)) {
+      return;
+    }
+
+    // RULE 4: For neutral titles, if excerpt has positive praise AND NO action/critique/questions, keep/set as 'minor'
+    const hasPraise = positivePraiseRegex.test(excerpt);
+    const hasCritique = critiqueOrQuestionRegex.test(excerpt);
+
+    if (hasPraise && !hasCritique) {
+      kp.severity = 'minor'; // On Track!
+    } else if (kp.severity === 'minor' && hasCritique) {
       kp.severity = 'moderate'; // Suggestion!
     }
   });

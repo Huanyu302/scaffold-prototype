@@ -1657,6 +1657,11 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
         };
       });
       sanitizeKeyPointSeverities(mappedKeyPoints as any);
+      mappedKeyPoints.sort((a, b) => {
+        const startA = a.startOffset >= 0 ? a.startOffset : Infinity;
+        const startB = b.startOffset >= 0 ? b.startOffset : Infinity;
+        return startA - startB;
+      });
 
       const formativeSchemaData = {
         projectId: draftProject.projectId,
@@ -3104,6 +3109,11 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
         };
       });
       sanitizeKeyPointSeverities(mappedKeyPoints2 as any);
+      mappedKeyPoints2.sort((a, b) => {
+        const startA = a.startOffset >= 0 ? a.startOffset : Infinity;
+        const startB = b.startOffset >= 0 ? b.startOffset : Infinity;
+        return startA - startB;
+      });
 
       const formativeSchemaData = {
         projectId: draftProject.projectId,
