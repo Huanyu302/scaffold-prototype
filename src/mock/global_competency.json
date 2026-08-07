@@ -1,0 +1,150 @@
+{
+  "studentId": "student-alex-001",
+  "academicHistory": [
+    {
+      "semester": "2025 Fall",
+      "courseId": "AUT-401",
+      "courseName": "Automotive Ethics & Software Safety",
+      "dimensions": {
+        "criticalThinking": 85,
+        "literatureSynthesis": 80,
+        "researchRigor": 88,
+        "academicWriting": 80,
+        "citationDiscipline": 90
+      }
+    },
+    {
+      "semester": "2026 Spring",
+      "courseId": "THE-502",
+      "courseName": "Autonomous Systems & Ethics",
+      "dimensions": {
+        "criticalThinking": 87,
+        "literatureSynthesis": 82,
+        "researchRigor": 85,
+        "academicWriting": 84,
+        "citationDiscipline": 92
+      }
+    },
+    {
+      "semester": "2026 Summer",
+      "courseId": "THE-600",
+      "courseName": "Algorithmic Accountability Thesis",
+      "dimensions": {
+        "criticalThinking": 88,
+        "literatureSynthesis": 85,
+        "researchRigor": 90,
+        "academicWriting": 82,
+        "citationDiscipline": 95
+      }
+    }
+  ],
+  "competencyTimeSeries": [
+    {
+      "date": "2025-12-15",
+      "scores": {
+        "criticalThinking": 85,
+        "literatureSynthesis": 80,
+        "researchRigor": 88,
+        "academicWriting": 80,
+        "citationDiscipline": 90
+      }
+    },
+    {
+      "date": "2026-05-20",
+      "scores": {
+        "criticalThinking": 87,
+        "literatureSynthesis": 82,
+        "researchRigor": 85,
+        "academicWriting": 84,
+        "citationDiscipline": 92
+      }
+    },
+    {
+      "date": "2026-07-07",
+      "scores": {
+        "criticalThinking": 88,
+        "literatureSynthesis": 85,
+        "researchRigor": 90,
+        "academicWriting": 82,
+        "citationDiscipline": 95
+      }
+    }
+  ],
+  "careerMatching": {
+    "matchedProfiles": [
+      {
+        "profileId": "tech-consultant",
+        "roleName": "Technology Consulting Advisor (Automotive Safety)",
+        "matchPercentage": 85,
+        "roleStrengths": [
+          "Citation Discipline",
+          "Research Rigor",
+          "Critical Thinking"
+        ],
+        "gaps": [
+          {
+            "competencyName": "Academic Writing",
+            "academicScore": 82,
+            "requiredScore": 85,
+            "gapDistance": 3
+          },
+          {
+            "competencyName": "Literature Synthesis",
+            "academicScore": 85,
+            "requiredScore": 90,
+            "gapDistance": 5
+          }
+        ]
+      },
+      {
+        "profileId": "academic-researcher",
+        "roleName": "Autonomous Systems Ethical Researcher",
+        "matchPercentage": 72,
+        "roleStrengths": [
+          "Citation Discipline",
+          "Research Rigor"
+        ],
+        "gaps": [
+          {
+            "competencyName": "Critical Thinking",
+            "academicScore": 88,
+            "requiredScore": 92,
+            "gapDistance": 4
+          },
+          {
+            "competencyName": "Literature Synthesis",
+            "academicScore": 85,
+            "requiredScore": 95,
+            "gapDistance": 10
+          }
+        ]
+      }
+    ],
+    "recommendedActions": [
+      {
+        "id": "act-001",
+        "targetCompetency": "academicWriting",
+        "title": "Schedule 1v1 Consultation at Academic Writing Center",
+        "description": "Book a personalized feedback session focusing on transitioning from subjective to neutral academic prose styles.",
+        "resourceType": "writing_center",
+        "actionLink": "https://university.edu/writing-center/schedule"
+      },
+      {
+        "id": "act-002",
+        "targetCompetency": "literatureSynthesis",
+        "title": "Literature Matrix & Thematic Synthesis Workshop",
+        "description": "Participate in a hands-on library workshop to learn relational matrix strategies for synthesizing dense technological texts.",
+        "resourceType": "workshop",
+        "actionLink": "https://library.university.edu/workshops/thematic-synthesis"
+      },
+      {
+        "id": "act-003",
+        "targetCompetency": "criticalThinking",
+        "title": "Safety-Critical Machine Learning Edge-Case Micro-Course",
+        "description": "Enrol in a self-paced online micro-course detailing verification methods for ML algorithms in safety-critical vehicle dynamics.",
+        "resourceType": "micro_course",
+        "actionLink": "https://online.university.edu/micro-courses/safety-ml"
+      }
+    ]
+  }
+}

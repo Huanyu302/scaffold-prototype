@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, button, input, textarea, select {
+    scroll-behavior: smooth;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+}
+
+.font-sf-pro {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* Global Glassmorphism panels */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Precise highlight markers */
+.highlight-anchor {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  background-color: transparent;
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin: 0 1px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  display: inline;
+}
+
+/* Formative workspace active highlight */
+.highlight-anchor-formative-active {
+  background-color: rgba(0, 163, 196, 0.18);
+}
+
+/* Summative dashboard active highlight */
+.highlight-anchor-summative-active {
+  background-color: rgba(26, 115, 232, 0.18);
+}
+
+/* Packaging transition animation for long-term archiving */
+@keyframes archive-package {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.9) translateY(-20px);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0) translateY(-200px);
+    opacity: 0;
+  }
+}
+
+.archive-animation {
+  animation: archive-package 0.8s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+}
+
+/* Smooth spring transition for perspective switching (Academic <=> Career) */
+.perspective-transition {
+  transition: background-color 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+              color 0.6s ease-in-out;
+}
+
+/* Academic state context styling */
+.theme-academic {
+  --theme-bg: #F8FAFC;
+  --theme-panel-border: rgba(0, 163, 196, 0.3);
+  --theme-color-active: #00A3C4;
+}
+
+/* Career state context styling */
+.theme-career {
+  --theme-bg: #0F172A;
+  --theme-panel-border: rgba(16, 185, 129, 0.3);
+  --theme-color-active: #10B981;
+}
+
+/* Fluid SVG shape morphing transition parameters */
+.morph-element {
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Single pulse flash animation for guide target elements (flashes once) */
+@keyframes flash-once {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-flash-once {
+  animation: flash-once 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1 forwards;
+}

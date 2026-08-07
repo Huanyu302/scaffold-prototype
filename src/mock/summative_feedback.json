@@ -1,0 +1,75 @@
+{
+  "projectId": "proj-summative-002",
+  "grade": "A-",
+  "originalFeedbackText": "Evaluation Report for Senior Thesis Submission\n\nStudent: Alex Chen\nProject Title: Algorithmic Accountability and Bias Mitigation in Automotive Safety Frameworks\n\nOverall Assessment:\nThis thesis provides a thorough evaluation of safety-critical algorithms in self-driving vehicle systems. The conceptual design of the safety audit framework is highly robust, demonstrating exceptional critical thinking. However, the literature synthesis, while extensive, lacks a structured transition into the empirical design. Additionally, the academic writing style could be polished to maintain a strictly objective tone throughout Section 4.\n\nEvaluation Details:\n\n1. Critical Thinking (Grade: 88/100):\nThe student demonstrates an outstanding ability to analyze complex ethical frameworks. The discussion on trolley-problem variations applied to machine learning models is particularly insightful, though it could benefit from a more rigorous edge-case analysis.\n\n2. Literature Synthesis (Grade: 85/100):\nThe literature review is broad and covers major milestones in autonomous systems ethics. However, there is a mismatch between the theoretical debates presented and the actual metrics used in the empirical setup in Section 5.\n\n3. Research Rigor (Grade: 90/100):\nThe audit framework was systematically implemented and tested against open datasets. The experimental parameters are well-defined, making the study highly reproducible.\n\n4. Academic Writing (Grade: 82/100):\nWhile the thesis is structured logically, there are several instances of subjective adjectives (e.g., 'incredible performance', 'disastrous collision rates') in Section 4 that should be replaced with neutral, data-driven descriptions.\n\n5. Citation Discipline (Grade: 95/100):\nReferencing is highly disciplined. Almost all sources are cited accurately in APA format, with only minor typos in secondary source attributions.",
+  "textTrackSummaries": [
+    {
+      "id": "tts-001",
+      "dimension": "Thesis Structuring",
+      "abstract": "The safety audit design displays excellent conceptual design, but the transition path from literature overview into empirical design is weak.",
+      "startOffset": 184,
+      "endOffset": 513
+    },
+    {
+      "id": "tts-002",
+      "dimension": "Literature Integration",
+      "abstract": "There is a logical gap between the high-level theoretical disputes listed and the metric variables selected for empirical testing.",
+      "startOffset": 995,
+      "endOffset": 1219
+    },
+    {
+      "id": "tts-003",
+      "dimension": "Analytical Argumentation",
+      "abstract": "Needs modification in Section 4 to clean out value-laden adjectives, establishing an objective data-driven baseline.",
+      "startOffset": 1463,
+      "endOffset": 1697
+    }
+  ],
+  "competencyScores": [
+    {
+      "dimensionId": "criticalThinking",
+      "dimensionName": "Critical Thinking",
+      "score": 88,
+      "maxScore": 100,
+      "description": "Demonstrates excellent analysis of trolley-problem modifications in ML models, though deep safety edge cases need more analytical rigor.",
+      "startOffset": 655,
+      "endOffset": 952
+    },
+    {
+      "dimensionId": "literatureSynthesis",
+      "dimensionName": "Literature Synthesis",
+      "score": 85,
+      "maxScore": 100,
+      "description": "Broad domain coverage, but theoretical framework debates do not match empirical metrics in Section 5.",
+      "startOffset": 954,
+      "endOffset": 1219
+    },
+    {
+      "dimensionId": "researchRigor",
+      "dimensionName": "Research Rigor",
+      "score": 90,
+      "maxScore": 100,
+      "description": "Excellent experimental design and reproducibility against open datasets with clearly defined metrics.",
+      "startOffset": 1221,
+      "endOffset": 1424
+    },
+    {
+      "dimensionId": "academicWriting",
+      "dimensionName": "Academic Writing",
+      "score": 82,
+      "maxScore": 100,
+      "description": "Well structured logically, but needs replacement of subjective vocabulary with academic objective styles.",
+      "startOffset": 1426,
+      "endOffset": 1697
+    },
+    {
+      "dimensionId": "citationDiscipline",
+      "dimensionName": "Citation Discipline",
+      "score": 95,
+      "maxScore": 100,
+      "description": "Accurate APA citations with minor issues in secondary attribution sources.",
+      "startOffset": 1699,
+      "endOffset": 1884
+    }
+  ]
+}
