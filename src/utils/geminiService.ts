@@ -1419,12 +1419,12 @@ COMPILATION & REASONING RULES:
    If the tutor feedback contains an explicit sub-scores breakdown, dimension grades, or weights (e.g., "Problem Framing & Contextual Understanding (40%): Very good (60-70)"), you MUST extract them into the "subScores" array. Do not return null if they exist in the feedback. If no such scores exist, set "subScores" to null.
 
 3. STRENGTHS & WEAKNESSES (Thematic Consolidation & Score Breakdown Stripping):
-   - CRITICAL ZERO-SKIPPED-PARAGRAPH & THEMATIC CONSOLIDATION MANDATE:
-     * 100% PARAGRAPH & DOCUMENT COVERAGE: You MUST perform an exhaustive extraction from the very first paragraph to the very last paragraph of originalFeedbackText. DO NOT skip any paragraph, section, or feedback topic under any circumstances! Every paragraph containing qualitative feedback MUST yield at least one thematic observation.
-     * NO NUMERIC ITEM CAP: Do NOT cap, limit, or truncate the number of observations. The total count of extracted observations MUST scale naturally with the length of the text (e.g. if the document has 8 or 12 distinct topic paragraphs, extract all 8 or 12 observations).
-     * SAME-PARAGRAPH EXAMPLE INTEGRATION: WITHIN each paragraph, merge illustrative example sentences starting with or containing "For example...", "For instance...", "Such as...", "Specifically...", "e.g.", "You mention...", "Outcomes such as..." into their parent thematic observation. DO NOT extract example sentences as separate standalone items!
-     * DO NOT MERGE ACROSS PARAGRAPHS: Do NOT merge sentences across different paragraphs or across distinct topic boundaries. Keep each paragraph's topic observation distinct and intact.
-     * COMPLETE MULTI-SENTENCE ANCHORING: The exactPhrase and anchor { start, end } for each observation MUST span the entire multi-sentence passage within that paragraph (the main point + its examples/elaborations verbatim from originalFeedbackText) so that text highlighting covers the full context seamlessly.
+   - CRITICAL THEMATIC CONSOLIDATION MANDATE (NO MICRO-FRAGMENTATION):
+     * You MUST synthesize cohesive, high-level, theme-grouped observations from originalFeedbackText rather than slicing text into tiny individual sentences.
+     * MANDATORY EXAMPLE INTEGRATION: Sentences starting with or containing "For example...", "For instance...", "Such as...", "Specifically...", "e.g.", "You mention...", "Outcomes such as...", or elaboration clauses MUST BE UNIFIED AND MERGED into the main parent observation that they illustrate. DO NOT extract example/elaboration sentences as separate standalone items!
+     * PARAGRAPH-LEVEL COHESION: Group consecutive sentences within the same paragraph that discuss the same core concept/issue into a single observation.
+     * COMPLETE MULTI-SENTENCE ANCHORING: The exactPhrase and anchor { start, end } for each observation MUST span the entire multi-sentence passage (the main point + its examples/elaborations verbatim from originalFeedbackText) so that text highlighting covers the full context seamlessly.
+     * EXHAUSTIVE COVERAGE: Extract all distinct observations and themes present in originalFeedbackText without omitting any point, while ensuring example/elaboration sentences are merged into their respective parent observations.
    - SCORE BREAKDOWN STRIPPING: You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)", grade descriptions, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
    - FEEDBACK NARRATIVE SANDBOXING: You must lock your qualitative analysis sandbox strictly to the free-text prose commentary (e.g. general feedback or descriptive review paragraphs).
    - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise passage), and anchor coordinates { start, end } representing the precise character offset range of the praise passage inside originalFeedbackText.
@@ -1710,23 +1710,21 @@ export const generateMockSummativeParsedResponse = (
 
       let title = generateTitleFromSentence(trimmed);
 
-      // MANDATORY THEMATIC MERGING FOR EXAMPLES & ELABORATIONS (SAME PARAGRAPH ONLY)
+      // MANDATORY THEMATIC MERGING FOR EXAMPLES & ELABORATIONS
       const isExampleOrElaboration = /^(for\s+example|for\s+instance|such\s+as|specifically|e\.g\.|you\s+mention|outcomes\s+such\s+as|in\s+particular|as\s+an\s+illustration|this\s+includes|including|which\s+means|meaning)\b/i.test(trimmed);
 
       if (isExampleOrElaboration) {
-        const lastImprovement = areasForImprovement[areasForImprovement.length - 1];
-        const lastStrength = keyStrengths[keyStrengths.length - 1];
-
-        // ONLY MERGE IF IN THE SAME PARAGRAPH (distance between anchor end and startOffset <= 60 chars)
-        if (lastImprovement && (startOffset - lastImprovement.anchor.end) >= 0 && (startOffset - lastImprovement.anchor.end) <= 60) {
-          lastImprovement.exactPhrase = `${lastImprovement.exactPhrase} ${trimmed}`;
-          lastImprovement.issueHighlight = `${lastImprovement.issueHighlight} ${trimmed}`;
-          lastImprovement.anchor.end = endOffset;
+        if (areasForImprovement.length > 0) {
+          const lastItem = areasForImprovement[areasForImprovement.length - 1];
+          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
+          lastItem.issueHighlight = `${lastItem.issueHighlight} ${trimmed}`;
+          lastItem.anchor.end = endOffset;
           return;
-        } else if (lastStrength && (startOffset - lastStrength.anchor.end) >= 0 && (startOffset - lastStrength.anchor.end) <= 60) {
-          lastStrength.exactPhrase = `${lastStrength.exactPhrase} ${trimmed}`;
-          lastStrength.praiseHighlight = `${lastStrength.praiseHighlight} ${trimmed}`;
-          lastStrength.anchor.end = endOffset;
+        } else if (keyStrengths.length > 0) {
+          const lastItem = keyStrengths[keyStrengths.length - 1];
+          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
+          lastItem.praiseHighlight = `${lastItem.praiseHighlight} ${trimmed}`;
+          lastItem.anchor.end = endOffset;
           return;
         }
       }
