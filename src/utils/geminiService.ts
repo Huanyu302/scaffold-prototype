@@ -1418,24 +1418,23 @@ COMPILATION & REASONING RULES:
 2. GRADE BREAKDOWN (Rubrics/PBL Component Value Extraction):
    If the tutor feedback contains an explicit sub-scores breakdown, dimension grades, or weights (e.g., "Problem Framing & Contextual Understanding (40%): Very good (60-70)"), you MUST extract them into the "subScores" array. Do not return null if they exist in the feedback. If no such scores exist, set "subScores" to null.
 
-3. STRENGTHS & WEAKNESSES (Feedback Narrative Sandboxing & Score Breakdown Stripping):
-   - CRITICAL COMPREHENSIVE ZERO-OMISSION MANDATE: You MUST perform a 100% sentence-level exhaustive extraction of originalFeedbackText from top to bottom. DO NOT skip any sentence or paragraph containing feedback remarks. Every single qualitative feedback sentence in originalFeedbackText MUST yield exactly one corresponding entry in either keyStrengths (if praising) or areasForImprovement (if critique). Do NOT merge multiple sentences into one item, and do NOT omit any sentence. The total count of keyStrengths plus areasForImprovement MUST equal the exact count of feedback sentences.
-   - SCORE BREAKDOWN STRIPPING: You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)",定性描述, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
+3. STRENGTHS & WEAKNESSES (Thematic Consolidation & Score Breakdown Stripping):
+   - CRITICAL THEMATIC CONSOLIDATION MANDATE (NO MICRO-FRAGMENTATION):
+     * You MUST synthesize cohesive, high-level, theme-grouped observations from originalFeedbackText rather than slicing text into tiny individual sentences.
+     * MANDATORY EXAMPLE INTEGRATION: Sentences starting with or containing "For example...", "For instance...", "Such as...", "Specifically...", "e.g.", "You mention...", "Outcomes such as...", or elaboration clauses MUST BE UNIFIED AND MERGED into the main parent observation that they illustrate. DO NOT extract example/elaboration sentences as separate standalone items!
+     * PARAGRAPH-LEVEL COHESION: Group consecutive sentences within the same paragraph that discuss the same core concept/issue into a single observation.
+     * COMPLETE MULTI-SENTENCE ANCHORING: The exactPhrase and anchor { start, end } for each observation MUST span the entire multi-sentence passage (the main point + its examples/elaborations verbatim from originalFeedbackText) so that text highlighting covers the full context seamlessly.
+     * CONCISE OBSERVATION COUNT: Aim for 3 to 6 high-value, comprehensive, theme-grouped observations per submission (combining keyStrengths and areasForImprovement).
+   - SCORE BREAKDOWN STRIPPING: You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)", grade descriptions, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
    - FEEDBACK NARRATIVE SANDBOXING: You must lock your qualitative analysis sandbox strictly to the free-text prose commentary (e.g. general feedback or descriptive review paragraphs).
-   - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough and Robust Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise sentence), and anchor coordinates { start, end } representing the precise character offset range of the praise sentence inside originalFeedbackText.
-   - AREAS FOR IMPROVEMENT (areasForImprovement): Extract specific qualitative critiques or improvements. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the critique clearly from a weakness/deficit perspective (e.g. "Difficult to Contrast Filter Details with Original Plan"), issueHighlight (micro-distillation of the issue), and anchor coordinates { start, end } representing the precise character offset range of the critique sentence.
+   - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise passage), and anchor coordinates { start, end } representing the precise character offset range of the praise passage inside originalFeedbackText.
+   - AREAS FOR IMPROVEMENT (areasForImprovement): Extract specific qualitative critiques or improvements. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the critique clearly from a weakness/deficit perspective (e.g. "ToC Causal Linkage & Input Gaps"), issueHighlight (micro-distillation of the issue passage), and anchor coordinates { start, end } representing the precise character offset range of the critique passage.
 
    - OBSERVATION TITLE SPECIFICATION (CRITICAL FOR ACCURACY & DE-DUPLICATION):
-     * EVALUATIVE STYLE (STRENGTH / WEAKNESS PERSPECTIVE): You are strictly forbidden from writing titles as actionable revision instructions or modification tasks (like "Provide explanation of validation pond" or "Reconcile APA citation"). Instead, write them from a performance feedback perspective, describing the presence of an asset or the deficit of a critique.
-     * NO GENERIC CATEGORY TAGS: You are strictly forbidden from using generic, short category tags or domain names (like "System Pre-requisites", "Contextual Information", "Literature Review", or "APA Reference") as titles. Doing so causes duplication and lacks precision.
-     * UNIQUE & DESCRIPTIVE SUMMARIES: Each card's title MUST be a precise, context-rich, and unique summary of the specific feedback observation. It must capture the exact noun, verb, or problem described in that sentence. For example:
-       - Instead of "System Pre-requisites", use "Incomplete Filter Prerequisite Inputs" or "Unshared Filter Configuration Details".
-       - Instead of "Contextual Information", use "Unexplained Key Introductory Terms" or "Missing Contextual Theory of Change".
-       - Instead of "Comparison Chart Rationale", use "Unclear Scoring Rationale for Waste Reduction".
-       - Instead of "Introduce Connection", use "Difficult to Contrast Filter Details with Original Plan".
-     * STRICT TITLE-CASE: The title must be in Title-Case and convey the specific asset or deficit clearly.
-     * STRICT TITLE WORD LIMIT (MAX 5 WORDS): Each title in keyStrengths and areasForImprovement MUST be strictly limited to AT MOST 5 WORDS (1 to 5 words maximum, e.g., "Robust Conceptual Design", "Unclear Waste Reduction Rationale"). Never exceed 5 words under any circumstances.
-     * SUB-CLAUSE GRANULAR ANCHORING (TRANSITIONAL & CONTRAST SENTENCES): When a feedback sentence contains contrasting clauses (e.g., starting with "While...", "Although...", or containing ", but...", ", however..."), DO NOT assign the full sentence anchor to both items. You MUST split the sentence at the clause boundary, setting exactPhrase and anchor { start, end } to Clause 1 for the keyStrengths item, and Clause 2 for the areasForImprovement item. Never assign overlapping start and end anchor ranges to separate items!
+     * EVALUATIVE STYLE (STRENGTH / WEAKNESS PERSPECTIVE): Write titles from a performance feedback perspective describing the presence of an asset or deficit.
+     * NO GENERIC CATEGORY TAGS: Avoid short generic tags. Each card's title MUST be a precise, context-rich, and unique summary of the thematic feedback observation.
+     * STRICT TITLE WORD LIMIT (MAX 5 WORDS): Each title in keyStrengths and areasForImprovement MUST be strictly limited to AT MOST 5 WORDS (1 to 5 words maximum, e.g., "Robust Conceptual Design", "Unclear Scoring Rationale"). Never exceed 5 words under any circumstances.
+     * SUB-CLAUSE GRANULAR ANCHORING (TRANSITIONAL & CONTRAST SENTENCES): When a feedback sentence contains contrasting clauses (e.g., starting with "While...", "Although...", or containing ", but...", ", however..."), split at the contrast boundary so praise goes to keyStrengths and critique goes to areasForImprovement. Never assign overlapping start and end anchor ranges to separate items!
 
 The JSON object must strictly adhere to this TypeScript schema:
 {
@@ -1710,6 +1709,25 @@ export const generateMockSummativeParsedResponse = (
       searchCursor = endOffset;
 
       let title = generateTitleFromSentence(trimmed);
+
+      // MANDATORY THEMATIC MERGING FOR EXAMPLES & ELABORATIONS
+      const isExampleOrElaboration = /^(for\s+example|for\s+instance|such\s+as|specifically|e\.g\.|you\s+mention|outcomes\s+such\s+as|in\s+particular|as\s+an\s+illustration|this\s+includes|including|which\s+means|meaning)\b/i.test(trimmed);
+
+      if (isExampleOrElaboration) {
+        if (areasForImprovement.length > 0) {
+          const lastItem = areasForImprovement[areasForImprovement.length - 1];
+          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
+          lastItem.issueHighlight = `${lastItem.issueHighlight} ${trimmed}`;
+          lastItem.anchor.end = endOffset;
+          return;
+        } else if (keyStrengths.length > 0) {
+          const lastItem = keyStrengths[keyStrengths.length - 1];
+          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
+          lastItem.praiseHighlight = `${lastItem.praiseHighlight} ${trimmed}`;
+          lastItem.anchor.end = endOffset;
+          return;
+        }
+      }
 
       if (isBad && !isGood) {
         areasForImprovement.push({
