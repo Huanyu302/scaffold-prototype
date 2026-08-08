@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ArrowLeft, Sparkles, Plus, FileText, Trash2, CheckSquare, Square, Folder, FolderOpen, GitCommit, Database, Lock, ChevronDown, ChevronRight, ChevronLeft, FileCheck, Archive, Loader2, FolderPlus, Filter, Edit3, MoreVertical, FolderInput, Tag, X, AlertCircle } from 'lucide-react';
 import { useAppStore, ProjectMaterial } from '../../store/useAppStore';
 import { mockArchiveFolders } from '../../data/mockArchiveAssets';
+import { OverlayScrollbarBox } from '../common/OverlayScrollbarBox';
 
 export const SourceSidebar: React.FC = () => {
   const {
@@ -1482,62 +1483,65 @@ export const SourceSidebar: React.FC = () => {
             </div>
 
             {/* Vertical Scrollable Folders List */}
-            <div
-              ref={wizardFoldersScrollRef}
-              className="max-h-[140px] overflow-y-auto space-y-1 pr-1 p-1.5 scrollbar-thin flex flex-col w-full bg-slate-50/60 border border-slate-200/60 rounded-xl"
+            <OverlayScrollbarBox
+              containerRef={wizardFoldersScrollRef}
+              className="max-h-[140px] h-[140px] w-full bg-slate-50/60 border border-slate-200/60 rounded-xl"
+              paddingClassName="p-1.5"
             >
-              {folders.map(f => {
-                const folderTag = f.tagId ? tags.find(t => t.id === f.tagId) : null;
-                const fColor = folderTag ? folderTag.color : '#94a3b8';
-                const isSelected = selectedPlacementFolderId === f.id;
+              <div className="flex flex-col space-y-1">
+                {folders.map(f => {
+                  const folderTag = f.tagId ? tags.find(t => t.id === f.tagId) : null;
+                  const fColor = folderTag ? folderTag.color : '#94a3b8';
+                  const isSelected = selectedPlacementFolderId === f.id;
 
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPlacementFolderId(f.id);
-                      setIsCreatingFolderInWizard(false);
-                    }}
-                    className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-xs font-sf-pro font-medium tracking-normal transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-slate-200/80 text-slate-900 font-semibold'
-                        : 'bg-transparent text-slate-650 hover:text-slate-800 hover:bg-slate-100/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
-                      {isSelected ? (
-                        <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: fColor }} />
-                      ) : (
-                        <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: fColor }} />
-                      )}
-                      <span className="truncate flex-1 tracking-normal">{formatTagText(f.name)}</span>
-                    </div>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlacementFolderId(f.id);
+                        setIsCreatingFolderInWizard(false);
+                      }}
+                      className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-xs font-sf-pro font-medium tracking-normal transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-200/80 text-slate-900 font-semibold'
+                          : 'bg-transparent text-slate-650 hover:text-slate-800 hover:bg-slate-100/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
+                        {isSelected ? (
+                          <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: fColor }} />
+                        ) : (
+                          <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: fColor }} />
+                        )}
+                        <span className="truncate flex-1 tracking-normal">{formatTagText(f.name)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
 
-              {/* Inline Input Field for New Folder */}
-              {isCreatingFolderInWizard && (
-                <div className="py-1 px-2 flex items-center gap-1.5 animate-in slide-in-from-bottom-2 duration-150">
-                  <Folder className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                  <input
-                    type="text"
-                    value={wizardNewFolderName}
-                    onChange={(e) => setWizardNewFolderName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleWizardCreateFolderConfirm();
-                      else if (e.key === 'Escape') setIsCreatingFolderInWizard(false);
-                    }}
-                    onBlur={handleWizardCreateFolderConfirm}
-                    placeholder="Press Enter to save..."
-                    className="w-full bg-transparent outline-none border-b border-slate-300 text-xs font-sf-pro font-medium text-slate-800 focus:border-slate-800 placeholder:text-slate-400 tracking-normal"
-                    autoFocus
-                    onClick={e => e.stopPropagation()}
-                  />
-                </div>
-              )}
-            </div>
+                {/* Inline Input Field for New Folder */}
+                {isCreatingFolderInWizard && (
+                  <div className="py-1 px-2 flex items-center gap-1.5 animate-in slide-in-from-bottom-2 duration-150">
+                    <Folder className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                    <input
+                      type="text"
+                      value={wizardNewFolderName}
+                      onChange={(e) => setWizardNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleWizardCreateFolderConfirm();
+                        else if (e.key === 'Escape') setIsCreatingFolderInWizard(false);
+                      }}
+                      onBlur={handleWizardCreateFolderConfirm}
+                      placeholder="Press Enter to save..."
+                      className="w-full bg-transparent outline-none border-b border-slate-300 text-xs font-sf-pro font-medium text-slate-800 focus:border-slate-800 placeholder:text-slate-400 tracking-normal"
+                      autoFocus
+                      onClick={e => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+              </div>
+            </OverlayScrollbarBox>
           </div>
 
           {/* Mode toggle pills */}
@@ -1823,31 +1827,36 @@ export const SourceSidebar: React.FC = () => {
               })}
 
               {/* Special final summative assessment node */}
-              {summativeFeedbackData && (
-                <div className="relative flex items-center group">
-                  {/* Stepper progress checkpoint dot matching theme color (vertically centered) */}
-                  <div 
-                    className={`absolute -left-[15px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border transition-all z-10 ${
-                      currentRoute === 'summative-dashboard' 
-                        ? 'border-brand-summative-primary bg-brand-summative-primary scale-110 shadow-2xs' 
-                        : 'border-slate-300 bg-white scale-90 group-hover:border-brand-summative-primary/60'
-                    }`}
-                  />
-                  <button
-                    onClick={() => {
-                      setRoute('summative-dashboard');
-                      useAppStore.setState({ activeRoundId: 'round-summative-final' });
-                    }}
-                    className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-sf-pro font-medium flex items-center transition-colors truncate cursor-pointer tracking-normal ${
-                      currentRoute === 'summative-dashboard'
-                        ? 'bg-slate-200/80 text-slate-900 font-semibold'
-                        : 'text-slate-650 hover:bg-slate-100/60 hover:text-slate-900'
-                    }`}
-                  >
-                    <span className="truncate">Summative</span>
-                  </button>
-                </div>
-              )}
+              {summativeFeedbackData && (() => {
+                const now = new Date();
+                const defaultDateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+                const summativeDate = summativeFeedbackData.date || defaultDateStr;
+                return (
+                  <div className="relative flex items-center group">
+                    {/* Stepper progress checkpoint dot matching theme color (vertically centered) */}
+                    <div 
+                      className={`absolute -left-[15px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border transition-all z-10 ${
+                        currentRoute === 'summative-dashboard' 
+                          ? 'border-brand-summative-primary bg-brand-summative-primary scale-110 shadow-2xs' 
+                          : 'border-slate-300 bg-white scale-90 group-hover:border-brand-summative-primary/60'
+                      }`}
+                    />
+                    <button
+                      onClick={() => {
+                        setRoute('summative-dashboard');
+                        useAppStore.setState({ activeRoundId: 'round-summative-final' });
+                      }}
+                      className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-sf-pro font-medium flex items-center transition-colors truncate cursor-pointer tracking-normal ${
+                        currentRoute === 'summative-dashboard'
+                          ? 'bg-slate-200/80 text-slate-900 font-semibold'
+                          : 'text-slate-650 hover:bg-slate-100/60 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="truncate">Summative ({summativeDate})</span>
+                    </button>
+                  </div>
+                );
+              })()}
 
               {formativeRounds.length === 0 && !summativeFeedbackData && (
                 <span className="text-xs font-sf-pro font-medium text-slate-400 select-none italic absolute left-[20px] tracking-normal">

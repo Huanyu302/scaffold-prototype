@@ -669,52 +669,46 @@ function determineAssociatedCriterion(sentence: string, handbookText?: string): 
 export function sanitizeKeyPointSeverities(keyPoints: ParsedKeyPoint[]) {
   if (!Array.isArray(keyPoints)) return;
 
-  // 1. Title-level Critique / Issue / Gap Keywords anywhere in the title
-  const titleCritiqueRegex = /\b(missing|generic|unclear|vague|lack|lacks|unexplained|inconsistent|incomplete|define|specify|integrate|reconcile|address|improve|issue|issues|gap|gaps|problem|problems|challenge|challenges|question|questions|query|queries|risk|risks|concern|concerns|required|needed|needs|uncertainty|uncertainties|flaw|flaws|limitation|limitations|bias|error|errors|weakness|weaknesses)\b/i;
+  // 1. Explicit Title-level Action / Edit / Directive / Critique Keywords in the title
+  const titleCritiqueRegex = /\b(missing|generic|unclear|vague|lack|lacks|unexplained|inconsistent|incomplete|define|specify|integrate|reconcile|address|improve|issue|issues|gap|gaps|problem|problems|question|questions|query|queries|risk|risks|concern|concerns|required|needed|needs|uncertainty|uncertainties|flaw|flaws|limitation|limitations|bias|error|errors|weakness|weaknesses|refine|modify|adjust|expand|elaborate|clarify|add|include|recommend|recommendation|suggestion|suggestions|request|requested)\b/i;
 
-  // 2. Title-level Praise Modifiers at start of title
-  const titlePraiseRegex = /^(strong|good|robust|well[-\s]|clear|excellent|insightful|solid|effective|exceptional|commendable|thorough)\b/i;
+  // 2. Title-level Praise Modifiers or Positive Accomplishment Keywords in the title
+  const titlePraiseRegex = /^(strong|strongly|good|robust|well[-\s]|clear|clearly|excellent|insightful|solid|effective|exceptional|commendable|thorough|smart|promising|accurate|comprehensive|valid|aligned|appropriate)\b/i;
 
-  // 3. Excerpt Level Question, Directive, Action, or Critique Indicators
-  const critiqueOrQuestionRegex = /\?|\b(you\s+need\s+to|needs?\s+to\s+be|you\s+should|should\s+be|must\s+be|be\s+sure\s+to|please\s+add|make\s+sure\s+to|you\s+must|clarify|consider|address|explain|elaborate|specify|improve|refine|modify|adjust|further|additional|add|expand|detail|details|unclear|vague|missing|lack|lacks|insufficient|not\s+clear|not\s+explicit|not\s+fully|rather\s+than|requires?|needed|needed\s+to|how\s+will|would\s+you|would\s+the|whether|how\s+to)\b/i;
+  // 3. Excerpt Level Direct Action Imperatives or Question Marks ONLY (strict regex, excluding passive descriptive words like "addressing")
+  const explicitDirectiveRegex = /\?|\b(you\s+need\s+to|needs?\s+to\s+be|you\s+should|should\s+be|must\s+be|be\s+sure\s+to|please\s+add|make\s+sure\s+to|you\s+must|clarify|consider|explain|elaborate|specify|improve|refine|modify|adjust|expand|unclear|vague|missing|lack|lacks|insufficient|not\s+clear|not\s+explicit|not\s+fully|rather\s+than|requires?|how\s+will|would\s+you|would\s+the|whether|how\s+to)\b/i;
 
   // 4. Excerpt Level Positive Praise
-  const positivePraiseRegex = /\b(done\s+a\s+strong|well[-\s]framed|well[-\s]defined|well[-\s]structured|clearly\s+scoped|strong\s+contextual|excellent|outstanding|good\s+job|robust|strong\s+analysis|insightful|exceptional|commendable|thoroughly|solid|praised|effective|great\s+progress|is\s+good\s+to\s+see|good\s+rationale|well\s+developed)\b/i;
+  const positivePraiseRegex = /\b(done\s+a\s+strong|well[-\s]framed|well[-\s]defined|well[-\s]structured|clearly\s+scoped|strong\s+contextual|excellent|outstanding|good\s+job|robust|strong\s+analysis|insightful|exceptional|commendable|thoroughly|solid|praised|effective|great\s+progress|is\s+good\s+to\s+see|good\s+rationale|well\s+developed|clearly\s+scoped\s+and\s+has\s+a\s+well[-\s]framed)\b/i;
 
   keyPoints.forEach(kp => {
     const title = (kp.title || '').trim();
     const excerpt = (kp.sourceExcerpt || '').trim();
-    const text = `${title} ${excerpt}`;
 
-    // RULE 1: If title contains ANY critique / gap / issue / question word, it CANNOT be 'minor' (On Track)!
+    // GROUND TRUTH CHECK 1: If title explicitly starts with praise or describes positive accomplishment (e.g. "Strongly Scoped Direction"),
+    // AND the title itself does NOT contain explicit critique/edit words (missing, lack, unclear, improve, specify, expand, etc.),
+    // then the summarized title is the GROUND TRUTH: it IS an "On Track" (minor) praise item!
+    if (titlePraiseRegex.test(title) && !titleCritiqueRegex.test(title)) {
+      kp.severity = 'minor'; // 100% On Track!
+      return;
+    }
+
+    // GROUND TRUTH CHECK 2: If title explicitly contains a critique / action directive word (e.g. "Expand Pilot Testing", "Unclear Methodology"),
+    // it CANNOT be 'minor' (On Track).
     if (titleCritiqueRegex.test(title)) {
       if (kp.severity === 'minor') {
-        kp.severity = 'moderate'; // Downgrade from On Track to Suggestion!
+        kp.severity = 'moderate'; // Downgrade to Suggestion!
       }
       return;
     }
 
-    // RULE 2: If excerpt contains question mark '?' or action directive / critique / question phrase, it CANNOT be 'minor' (On Track)!
-    if (critiqueOrQuestionRegex.test(excerpt) || critiqueOrQuestionRegex.test(text)) {
-      if (kp.severity === 'minor') {
-        kp.severity = 'moderate'; // Downgrade from On Track to Suggestion!
-      }
-      return;
-    }
-
-    // RULE 3: If title starts with praise AND has no critique words in title/excerpt, set to 'minor' (On Track)
-    if (titlePraiseRegex.test(title) && !titleCritiqueRegex.test(text) && !critiqueOrQuestionRegex.test(text)) {
-      kp.severity = 'minor'; // On Track!
-      return;
-    }
-
-    // RULE 4: For neutral titles, if excerpt has positive praise AND NO action/critique/questions, keep/set as 'minor'
+    // GROUND TRUTH CHECK 3: For neutral titles, check excerpt.
+    const hasExplicitDirective = explicitDirectiveRegex.test(excerpt);
     const hasPraise = positivePraiseRegex.test(excerpt);
-    const hasCritique = critiqueOrQuestionRegex.test(excerpt);
 
-    if (hasPraise && !hasCritique) {
+    if (hasPraise && !hasExplicitDirective) {
       kp.severity = 'minor'; // On Track!
-    } else if (kp.severity === 'minor' && hasCritique) {
+    } else if (kp.severity === 'minor' && hasExplicitDirective) {
       kp.severity = 'moderate'; // Suggestion!
     }
   });
@@ -1525,6 +1519,7 @@ export interface SummativeNextSteps {
 
 export interface SummativeParsedResponse {
   projectId: string;
+  date?: string;
   grade: string;
   isAutoCalculated?: boolean;
   originalFeedbackText: string;

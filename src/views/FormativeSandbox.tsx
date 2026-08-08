@@ -4,6 +4,7 @@ import { useAppStore, SandboxTodoItem, ChatMessage } from '../store/useAppStore'
 import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
 import { calculateWeightedGrade } from '../utils/geminiService';
+import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 export const FormativeSandbox: React.FC = () => {
   const {
@@ -659,7 +660,7 @@ export const FormativeSandbox: React.FC = () => {
         {/* ======================================================== */}
         {/* LEFT COLUMN: AI Assistant & Dynamic Tool Workspace Canvas */}
         {/* ======================================================== */}
-        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-120px)] min-h-[500px]'}`}>
+        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
           
           {!formativeFeedbackData.originalFeedbackText ? (
             /* Idle complete blank state placeholder */
@@ -713,11 +714,10 @@ export const FormativeSandbox: React.FC = () => {
               </div>
 
               {/* Tab Contents Viewport */}
-              <div className="flex-1 p-4 min-h-0 relative select-none">
+              <div className="flex-1 p-0 min-h-0 relative select-none">
                 {activeLeftTab === 'briefing' && (
-                  <div className="flex flex-col gap-3 h-full overflow-hidden w-full max-w-full">
-                    {/* Scrollable Container covering Overview + Batch Actions + Checklist */}
-                    <div ref={briefingScrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full flex flex-col gap-3 pr-1 scrollbar-none">
+                  <OverlayScrollbarBox containerRef={briefingScrollContainerRef} className="h-full" paddingClassName="p-5">
+                    <div className="flex flex-col gap-3 min-h-full">
                       {/* Executive Dashboard Overview */}
                     {isAIWorking ? (
                       /* Skeleton Loading Card to prevent layout shift */
@@ -1246,273 +1246,279 @@ export const FormativeSandbox: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </div>
-                )}
+                </OverlayScrollbarBox>
+              )}
 
                 {activeLeftTab === 'todo' && (
-                  <div className="flex flex-col gap-3.5 h-full justify-between overflow-hidden">
-                    <div className="flex flex-col gap-3.5 overflow-y-auto flex-1 mb-3">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-shrink-0">
-                        <h4 className="text-sm font-heading font-bold text-slate-700 flex items-center gap-1">
-                          Todo List
-                        </h4>
-                        
-                        {/* Individual Bubble Action Buttons */}
-                        <div className="flex items-center gap-3">
-                          {/* AI Assistant validation trigger icon with tooltip */}
-                          <div className="relative group/tooltip flex items-center">
+                  <div className="flex flex-col justify-between h-full gap-2 min-h-0">
+                    {/* Scrollable Todo List Items Container */}
+                    <OverlayScrollbarBox className="flex-1 min-h-0" paddingClassName="px-5 pt-5 pb-1">
+                      <div className="flex flex-col gap-3 min-h-full">
+                        {/* Header Bar */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-shrink-0">
+                          <h4 className="text-sm font-heading font-bold text-slate-700 flex items-center gap-1">
+                            Todo List
+                          </h4>
+                          
+                          {/* Individual Bubble Action Buttons */}
+                          <div className="flex items-center gap-3">
+                            {/* AI Assistant validation trigger icon with tooltip */}
+                            <div className="relative group/tooltip flex items-center">
+                              <button
+                                onClick={validateTodoWithAI}
+                                disabled={todoList.length === 0 || isAIWorking}
+                                className={`w-7 h-7 rounded-lg border transition-all duration-150 flex items-center justify-center ${
+                                  todoList.length > 0 && !isAIWorking
+                                    ? 'bg-slate-50 border-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 cursor-pointer'
+                                    : 'bg-slate-50/50 border-slate-200/40 text-slate-350 cursor-not-allowed opacity-50'
+                                }`}
+                                title="Check my todo"
+                              >
+                                <Bot className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
+                                Check my todo
+                              </div>
+                            </div>
+
+                            {/* Toggle Edit/Lock status */}
                             <button
-                              onClick={validateTodoWithAI}
-                              disabled={todoList.length === 0 || isAIWorking}
+                              onClick={() => setTodoMode(todoMode === 'edit' ? 'locked' : 'edit')}
+                              disabled={todoList.length === 0}
                               className={`w-7 h-7 rounded-lg border transition-all duration-150 flex items-center justify-center ${
-                                todoList.length > 0 && !isAIWorking
+                                todoList.length > 0
                                   ? 'bg-slate-50 border-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 cursor-pointer'
                                   : 'bg-slate-50/50 border-slate-200/40 text-slate-350 cursor-not-allowed opacity-50'
                               }`}
-                              title="Check my todo"
+                              title={todoMode === 'edit' ? 'Lock list' : 'Edit list'}
                             >
-                              <Bot className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
-                              Check my todo
-                            </div>
-                          </div>
-
-                          {/* Toggle Edit/Lock status */}
-                          <button
-                            onClick={() => setTodoMode(todoMode === 'edit' ? 'locked' : 'edit')}
-                            disabled={todoList.length === 0}
-                            className={`w-7 h-7 rounded-lg border transition-all duration-150 flex items-center justify-center ${
-                              todoList.length > 0
-                                ? 'bg-slate-50 border-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 cursor-pointer'
-                                : 'bg-slate-50/50 border-slate-200/40 text-slate-350 cursor-not-allowed opacity-50'
-                            }`}
-                            title={todoMode === 'edit' ? 'Lock list' : 'Edit list'}
-                          >
-                            {todoMode === 'edit' ? (
-                              <Lock className="w-3.5 h-3.5" />
-                            ) : (
-                              <Edit className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* List items scrollable container */}
-                      <div className="space-y-2 overflow-y-auto flex-1 pr-1">
-                        {todoList.length === 0 ? (
-                          <div className="p-4 text-center border border-dashed border-slate-200 rounded-lg bg-slate-50/50">
-                            <p className="text-[10px] text-slate-450 font-body italic leading-relaxed">
-                              Your Todo List is empty. Click "+ Add Task" below to construct your checklist manually.
-                            </p>
-                          </div>
-                        ) : (
-                          todoList.map((todo, idx) => (
-                             <div
-                               key={todo.id}
-                               className={`flex items-start justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl transition-colors duration-200 hover:border-brand-formative-primary/60 relative overflow-hidden ${todo.phase ? 'pl-3.5' : ''}`}
-                             >
-                               {todo.phase && (
-                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                   todo.phase === 'early' ? 'bg-indigo-500' :
-                                   todo.phase === 'mid' ? 'bg-emerald-500' : 'bg-amber-500'
-                                 }`} />
-                               )}
-                              {/* Left Side input vs checkbox indicator */}
-                              {todoMode === 'edit' && (
-                                <span className="text-[9.5px] font-sf-pro font-medium text-slate-400 w-3.5 flex-shrink-0 mt-0.5 select-none">
-                                  {idx + 1}
-                                </span>
+                              {todoMode === 'edit' ? (
+                                <Lock className="w-3.5 h-3.5" />
+                              ) : (
+                                <Edit className="w-3.5 h-3.5" />
                               )}
+                            </button>
+                          </div>
+                        </div>
 
-                              {/* Main contents display & inline edit logic */}
-                              <div className="flex-1 mr-2 min-w-0">
-                                {todoMode === 'edit' ? (
-                                  <div className="flex flex-col gap-0.5">
-                                    {/* Inline Title Edit */}
-                                    {editingTaskId === todo.id && editingField === 'title' ? (
-                                      <input
-                                        type="text"
-                                        value={editingVal}
-                                        onChange={(e) => setEditingVal(e.target.value)}
-                                        onBlur={() => {
-                                          if (editingVal.trim()) {
-                                            handleEditTask(todo.id, editingVal.trim(), 'title');
-                                          }
-                                          setEditingTaskId(null);
-                                          setEditingField(null);
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
+                        {/* List items scrollable container */}
+                        <div className="space-y-2 flex-1">
+                          {todoList.length === 0 ? (
+                            <div className="p-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                              <p className="text-xs text-slate-450 font-body italic leading-relaxed">
+                                Your Todo List is empty. Click "+ Add Task" below to construct your checklist manually.
+                              </p>
+                            </div>
+                          ) : (
+                            todoList.map((todo, idx) => (
+                               <div
+                                 key={todo.id}
+                                 className={`flex items-start justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl transition-colors duration-200 hover:border-brand-formative-primary/60 relative overflow-hidden ${todo.phase ? 'pl-3.5' : ''}`}
+                               >
+                                 {todo.phase && (
+                                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                     todo.phase === 'early' ? 'bg-indigo-500' :
+                                     todo.phase === 'mid' ? 'bg-emerald-500' : 'bg-amber-500'
+                                   }`} />
+                                 )}
+                                {/* Left Side input vs checkbox indicator */}
+                                {todoMode === 'edit' && (
+                                  <span className="text-[9.5px] font-sf-pro font-medium text-slate-400 w-3.5 flex-shrink-0 mt-0.5 select-none">
+                                    {idx + 1}
+                                  </span>
+                                )}
+
+                                {/* Main contents display & inline edit logic */}
+                                <div className="flex-1 mr-2 min-w-0">
+                                  {todoMode === 'edit' ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      {/* Inline Title Edit */}
+                                      {editingTaskId === todo.id && editingField === 'title' ? (
+                                        <input
+                                          type="text"
+                                          value={editingVal}
+                                          onChange={(e) => setEditingVal(e.target.value)}
+                                          onBlur={() => {
                                             if (editingVal.trim()) {
                                               handleEditTask(todo.id, editingVal.trim(), 'title');
                                             }
                                             setEditingTaskId(null);
                                             setEditingField(null);
-                                          }
-                                        }}
-                                        className="w-full font-body text-[11px] font-bold text-slate-800 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-formative-primary rounded px-1.5 py-0.5"
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span
-                                        onClick={() => {
-                                          setEditingTaskId(todo.id);
-                                          setEditingField('title');
-                                          setEditingVal(todo.title);
-                                        }}
-                                        className="font-body text-[11px] font-bold text-slate-800 cursor-pointer border border-transparent hover:border-slate-200/50 hover:bg-slate-50 px-1 rounded block truncate transition-all"
-                                        title="Click to edit title"
-                                      >
-                                        {todo.title}
-                                      </span>
-                                    )}
-
-                                    {/* Inline Description Edit */}
-                                    {editingTaskId === todo.id && editingField === 'description' ? (
-                                      <textarea
-                                        value={editingVal}
-                                        onChange={(e) => setEditingVal(e.target.value)}
-                                        onBlur={() => {
-                                          handleEditTask(todo.id, editingVal.trim(), 'description');
-                                          setEditingTaskId(null);
-                                          setEditingField(null);
-                                        }}
-                                        className="w-full font-body text-[10px] text-slate-500 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-formative-primary rounded px-1.5 py-0.5 mt-1 resize-none h-12 leading-relaxed"
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span
-                                        onClick={() => {
-                                          setEditingTaskId(todo.id);
-                                          setEditingField('description');
-                                          setEditingVal(todo.description || '');
-                                        }}
-                                        className="font-body text-[10px] text-slate-500 cursor-pointer border border-transparent hover:border-slate-200/50 hover:bg-slate-50 px-1 rounded block mt-0.5 leading-relaxed transition-all break-words"
-                                        title="Click to edit description"
-                                      >
-                                        {todo.description ? (
-                                          todo.description
-                                        ) : (
-                                          <span className="text-slate-400 block text-[9px]">
-                                            Click to specify execution details
-                                          </span>
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  /* Locked checklist mode */
-                                  <div className="flex flex-col flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <button
-                                           type="button"
-                                           onClick={(e) => {
-                                             e.stopPropagation();
-                                             handleToggleTaskCompleted(todo.id);
-                                           }}
-                                           className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
-                                             todo.isCompleted
-                                               ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
-                                               : 'border-slate-300 bg-white hover:border-brand-formative-primary'
-                                           }`}
-                                           title={todo.isCompleted ? 'Mark as pending' : 'Mark as completed'}
-                                         >
-                                           {todo.isCompleted && <Check className="w-3 h-3 stroke-[3]" />}
-                                         </button>
-                                        <span className={`text-[11px] font-body font-bold transition-all truncate ${
-                                          todo.isCompleted ? 'line-through text-slate-400 italic' : 'text-slate-800'
-                                        }`}>
-                                          {todo.title}
-                                        </span>
-                                      </div>
-                                      {todo.description && (
-                                        <button
-                                          onClick={() => {
-                                            if (expandedTaskIds.includes(todo.id)) {
-                                              setExpandedTaskIds(expandedTaskIds.filter(id => id !== todo.id));
-                                            } else {
-                                              setExpandedTaskIds([...expandedTaskIds, todo.id]);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              if (editingVal.trim()) {
+                                                handleEditTask(todo.id, editingVal.trim(), 'title');
+                                              }
+                                              setEditingTaskId(null);
+                                              setEditingField(null);
                                             }
                                           }}
-                                          className="text-[8px] font-heading font-extrabold text-brand-formative-primary hover:underline uppercase flex items-center gap-0.5 ml-2 cursor-pointer flex-shrink-0"
+                                          className="w-full font-body text-[11px] font-bold text-slate-800 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-formative-primary rounded px-1.5 py-0.5"
+                                          autoFocus
+                                        />
+                                      ) : (
+                                        <span
+                                          onClick={() => {
+                                            setEditingTaskId(todo.id);
+                                            setEditingField('title');
+                                            setEditingVal(todo.title);
+                                          }}
+                                          className="font-body text-[11px] font-bold text-slate-800 cursor-pointer border border-transparent hover:border-slate-200/50 hover:bg-slate-50 px-1 rounded block truncate transition-all"
+                                          title="Click to edit title"
                                         >
-                                          {expandedTaskIds.includes(todo.id) ? 'Hide Details' : 'Show Details'}
-                                        </button>
+                                          {todo.title}
+                                        </span>
+                                      )}
+
+                                      {/* Inline Description Edit */}
+                                      {editingTaskId === todo.id && editingField === 'description' ? (
+                                        <textarea
+                                          value={editingVal}
+                                          onChange={(e) => setEditingVal(e.target.value)}
+                                          onBlur={() => {
+                                            handleEditTask(todo.id, editingVal.trim(), 'description');
+                                            setEditingTaskId(null);
+                                            setEditingField(null);
+                                          }}
+                                          className="w-full font-body text-[10px] text-slate-500 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-formative-primary rounded px-1.5 py-0.5 mt-1 resize-none h-12 leading-relaxed"
+                                          autoFocus
+                                        />
+                                      ) : (
+                                        <span
+                                          onClick={() => {
+                                            setEditingTaskId(todo.id);
+                                            setEditingField('description');
+                                            setEditingVal(todo.description || '');
+                                          }}
+                                          className="font-body text-[10px] text-slate-500 cursor-pointer border border-transparent hover:border-slate-200/50 hover:bg-slate-50 px-1 rounded block mt-0.5 leading-relaxed transition-all break-words"
+                                          title="Click to edit description"
+                                        >
+                                          {todo.description ? (
+                                            todo.description
+                                          ) : (
+                                            <span className="text-slate-400 block text-[9px]">
+                                              Click to specify execution details
+                                            </span>
+                                          )}
+                                        </span>
                                       )}
                                     </div>
-
-                                    {todo.description && expandedTaskIds.includes(todo.id) && (
-                                      <div className="mt-1 pl-5.5 text-[10px] text-slate-500 leading-relaxed font-body border-l border-slate-200 animate-in slide-in-from-top-1 duration-150 break-words">
-                                        {todo.description}
+                                  ) : (
+                                    /* Locked checklist mode */
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <button
+                                             type="button"
+                                             onClick={(e) => {
+                                               e.stopPropagation();
+                                               handleToggleTaskCompleted(todo.id);
+                                             }}
+                                             className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
+                                               todo.isCompleted
+                                                 ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
+                                                 : 'border-slate-300 bg-white hover:border-brand-formative-primary'
+                                             }`}
+                                             title={todo.isCompleted ? 'Mark as pending' : 'Mark as completed'}
+                                           >
+                                             {todo.isCompleted && <Check className="w-3 h-3 stroke-[3]" />}
+                                           </button>
+                                          <span className={`text-[11px] font-body font-bold transition-all truncate ${
+                                            todo.isCompleted ? 'line-through text-slate-400 italic' : 'text-slate-800'
+                                          }`}>
+                                            {todo.title}
+                                          </span>
+                                        </div>
+                                        {todo.description && (
+                                          <button
+                                            onClick={() => {
+                                              if (expandedTaskIds.includes(todo.id)) {
+                                                setExpandedTaskIds(expandedTaskIds.filter(id => id !== todo.id));
+                                              } else {
+                                                setExpandedTaskIds([...expandedTaskIds, todo.id]);
+                                              }
+                                            }}
+                                            className="text-[8px] font-heading font-extrabold text-brand-formative-primary hover:underline uppercase flex items-center gap-0.5 ml-2 cursor-pointer flex-shrink-0"
+                                          >
+                                            {expandedTaskIds.includes(todo.id) ? 'Hide Details' : 'Show Details'}
+                                          </button>
+                                        )}
                                       </div>
-                                    )}
+
+                                      {todo.description && expandedTaskIds.includes(todo.id) && (
+                                        <div className="mt-1 pl-5.5 text-[10px] text-slate-500 leading-relaxed font-body border-l border-slate-200 animate-in slide-in-from-top-1 duration-150 break-words">
+                                          {todo.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Right Side actions (Only in Edit mode) */}
+                                {todoMode === 'edit' && (
+                                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                                    <button
+                                      onClick={() => handleMoveUp(idx)}
+                                      disabled={idx === 0}
+                                      className="p-0.5 rounded text-slate-400 hover:text-slate-600 disabled:opacity-25 transition-colors cursor-pointer"
+                                      title="Move Task Up"
+                                    >
+                                      <ArrowUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleMoveDown(idx)}
+                                      disabled={idx === todoList.length - 1}
+                                      className="p-0.5 rounded text-slate-400 hover:text-slate-600 disabled:opacity-25 transition-colors cursor-pointer"
+                                      title="Move Task Down"
+                                    >
+                                      <ArrowDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTask(todo.id)}
+                                      className="p-0.5 rounded text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title="Delete Task"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 )}
                               </div>
-                              
-                              {/* Right Side actions (Only in Edit mode) */}
-                              {todoMode === 'edit' && (
-                                <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-                                  <button
-                                    onClick={() => handleMoveUp(idx)}
-                                    disabled={idx === 0}
-                                    className="p-0.5 rounded text-slate-400 hover:text-slate-600 disabled:opacity-25 transition-colors cursor-pointer"
-                                    title="Move Task Up"
-                                  >
-                                    <ArrowUp className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleMoveDown(idx)}
-                                    disabled={idx === todoList.length - 1}
-                                    className="p-0.5 rounded text-slate-400 hover:text-slate-600 disabled:opacity-25 transition-colors cursor-pointer"
-                                    title="Move Task Down"
-                                  >
-                                    <ArrowDown className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTask(todo.id)}
-                                    className="p-0.5 rounded text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-                                    title="Delete Task"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </OverlayScrollbarBox>
 
                     {/* Edit mode modifiers bottom dock */}
                     {todoMode === 'edit' && (
-                      <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-3 flex-shrink-0">
-                        {/* Add Task item box */}
-                        <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Task Title (e.g., Define safety boundaries)..."
-                              value={newTodoText}
-                              onChange={(e) => setNewTodoText(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                              className="flex-1 font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-formative-primary focus:ring-1 focus:ring-brand-formative-primary/20"
+                      <div className="flex-shrink-0 px-5 pb-5 pt-1 select-text bg-white">
+                        <div className="border-t border-slate-100 pt-2.5 flex flex-col gap-2">
+                          {/* Add Task item box */}
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Task Title (e.g., Define safety boundaries)..."
+                                value={newTodoText}
+                                onChange={(e) => setNewTodoText(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                                className="flex-1 font-body text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-brand-formative-primary focus:ring-1 focus:ring-brand-formative-primary/20 shadow-2xs"
+                              />
+                              <button
+                                onClick={handleAddTask}
+                                className="py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-sf-pro font-semibold shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-[1.01] active:scale-[0.99]"
+                              >
+                                Add Task
+                              </button>
+                            </div>
+                            <textarea
+                              placeholder="Detailed Description (Detailed context, sub-tasks)..."
+                              value={newTodoDesc}
+                              onChange={(e) => setNewTodoDesc(e.target.value)}
+                              className="w-full font-body text-xs border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:outline-none focus:border-brand-formative-primary focus:ring-1 focus:ring-brand-formative-primary/20 h-14 resize-none leading-relaxed shadow-2xs"
                             />
-                            <button
-                              onClick={handleAddTask}
-                              className="py-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-sf-pro font-semibold shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-[1.01] active:scale-[0.99]"
-                            >
-                              Add Task
-                            </button>
                           </div>
-                          <textarea
-                            placeholder="Detailed Description (Detailed context, sub-tasks)..."
-                            value={newTodoDesc}
-                            onChange={(e) => setNewTodoDesc(e.target.value)}
-                            className="w-full font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-formative-primary focus:ring-1 focus:ring-brand-formative-primary/20 h-14 resize-none leading-relaxed"
-                          />
                         </div>
                       </div>
                     )}
@@ -1528,7 +1534,7 @@ export const FormativeSandbox: React.FC = () => {
         {/* ======================================================== */}
         {/* RIGHT COLUMN: Multi-mode Shared Capsule view            */}
         {/* ======================================================== */}
-        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-120px)] min-h-[500px]'}`}>
+        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
           {activeRightTab === 'input' ? (
             /* raw input configuration view */
             <div className="h-full flex-1 flex flex-col justify-between p-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs relative overflow-hidden font-sf-pro">
@@ -1669,7 +1675,7 @@ export const FormativeSandbox: React.FC = () => {
               </div>
 
               {/* Tab Contents */}
-              <div className={`flex-1 min-h-0 relative select-none ${activeRightTab === 'document' ? 'p-0' : 'p-4'}`}>
+              <div className={`flex-1 min-h-0 relative select-none ${activeRightTab === 'transcript' || activeRightTab === 'document' ? 'p-0' : 'p-5'}`}>
                 <div className={`h-full ${activeRightTab === 'transcript' ? 'block' : 'hidden'}`}>
                   {/* OriginalTextPanel View */}
                   <OriginalTextPanel

@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { Edit } from 'lucide-react';
 
 import { useAppStore } from '../../store/useAppStore';
+import { OverlayScrollbarBox } from '../common/OverlayScrollbarBox';
 
 interface OriginalTextPanelProps {
   originalText: string;
@@ -269,55 +270,48 @@ export const OriginalTextPanel: React.FC<OriginalTextPanelProps> = ({
   const effectiveHighlightRange = routeTheme === 'formative' ? resolvedHighlightRange : resolvedSummativeRange;
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden">
-      {/* Top Header Controls aligned with Left Panel headers */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-shrink-0">
-        <h4 className="text-sm font-heading font-bold text-slate-700">
-          Original Feedback Transcript
-        </h4>
-        <button
-          onClick={() => {
-            if (onEditClick) {
-              onEditClick();
-            } else if (routeTheme === 'formative') {
-              setRawFeedbackInput(originalText);
-              setActiveRightTab('input');
-            }
-          }}
-          className="w-7 h-7 rounded-lg border bg-slate-50 border-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-all duration-150 flex items-center justify-center cursor-pointer"
-          title="Edit original feedback input"
-        >
-          <Edit className="w-3.5 h-3.5" />
-        </button>
-      </div>
+    <OverlayScrollbarBox 
+      containerRef={containerRef}
+      className="h-full w-full"
+      paddingClassName="p-5"
+    >
+      <div className="w-full flex flex-col gap-3 min-h-full">
+        {/* Top Header Controls aligned with Left Panel headers */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-shrink-0">
+          <h4 className="text-sm font-heading font-bold text-slate-700">
+            Original Feedback Transcript
+          </h4>
+          <button
+            onClick={() => {
+              if (onEditClick) {
+                onEditClick();
+              } else if (routeTheme === 'formative') {
+                setRawFeedbackInput(originalText);
+                setActiveRightTab('input');
+              }
+            }}
+            className="w-7 h-7 rounded-lg border bg-slate-50 border-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300 transition-all duration-150 flex items-center justify-center cursor-pointer"
+            title="Edit original feedback input"
+          >
+            <Edit className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-      {/* Main Text Container Box */}
-      <div 
-        ref={containerRef}
-        onScroll={(e) => {
-          const target = e.currentTarget;
-          target.classList.add('is-scrolling');
-          if ((target as any)._scrollTimeout) {
-            clearTimeout((target as any)._scrollTimeout);
-          }
-          (target as any)._scrollTimeout = setTimeout(() => {
-            target.classList.remove('is-scrolling');
-          }, 1000);
-        }}
-        className="flex-1 overflow-y-auto overflow-x-hidden pt-3 scroll-smooth scrollbar-gemini-overlay"
-      >
-        {paragraphs.map((p) => (
-          <ParagraphRow
-            key={p.id}
-            text={p.text}
-            pStart={p.pStart}
-            pEnd={p.pEnd}
-            highlightRange={effectiveHighlightRange}
-            routeTheme={routeTheme}
-            activeSpanRef={activeSpanRef}
-          />
-        ))}
+        {/* Main Text Container Box */}
+        <div className="flex-1 pt-1">
+          {paragraphs.map((p) => (
+            <ParagraphRow
+              key={p.id}
+              text={p.text}
+              pStart={p.pStart}
+              pEnd={p.pEnd}
+              highlightRange={effectiveHighlightRange}
+              routeTheme={routeTheme}
+              activeSpanRef={activeSpanRef}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </OverlayScrollbarBox>
   );
 };

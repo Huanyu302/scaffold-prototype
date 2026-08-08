@@ -7,6 +7,7 @@ import { GapAnalysisList } from '../components/career/GapAnalysisList';
 import { FreeformCopilotChat } from '../components/chat/FreeformCopilotChat';
 import { mockArchiveFolders, ArchiveFolder } from '../data/mockArchiveAssets';
 import { generateCareerRoleAnalysis, DynamicCareerRoleAnalysis } from '../utils/geminiService';
+import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 const PRESET_CAREER_PROFILES: Record<string, {
   roleName: string;
   matchPercentage: number;
@@ -1177,7 +1178,7 @@ export const GlobalCompetency: React.FC = () => {
           {/* ======================================================== */}
           {/* LEFT MASTER CARD: Long-Term Dashboard (8/12) */}
           {/* ======================================================== */}
-          <div className="lg:col-span-8 h-[calc(100vh-120px)] min-h-[500px] flex-1 flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden relative">
+          <div className="lg:col-span-8 h-[calc(100vh-112px)] min-h-[500px] flex-1 flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden relative">
             
             {/* Top Switcher Tab Bar with Divider Line (Formative Tab UI Style) */}
             <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 bg-slate-50/50 flex-shrink-0">
@@ -1215,7 +1216,7 @@ export const GlobalCompetency: React.FC = () => {
             </div>
 
             {/* Interior Canvas Directly BELOW the Divider (NO Nested Card Shell!) */}
-            <div className="p-5 flex-1 flex flex-col gap-4 bg-white overflow-y-auto custom-scrollbar">
+            <OverlayScrollbarBox className="flex-1 min-h-0 bg-white" paddingClassName="p-5">
               {perspective === 'academic' ? (
                 /* ACADEMIC VIEW: KNOWLEDGE NOTES REPOSITORY (Notes) */
                 <div className="flex flex-col gap-4 flex-1 h-full">
@@ -2055,14 +2056,14 @@ export const GlobalCompetency: React.FC = () => {
 
                 </div>
               )}
-            </div>
+            </OverlayScrollbarBox>
 
           </div>
 
           {/* ======================================================== */}
           {/* RIGHT MASTER CARD: 3-Segmented Module (4/12) */}
           {/* ======================================================== */}
-          <div className="lg:col-span-4 h-[calc(100vh-120px)] min-h-[500px] flex-1 flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden relative">
+          <div className="lg:col-span-4 h-[calc(100vh-112px)] min-h-[500px] flex-1 flex flex-col bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden relative">
             
             {/* Top Switcher Tab Bar with Divider Line (Formative Tab UI Style) */}
             <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 bg-slate-50/50 flex-shrink-0">
@@ -2113,7 +2114,8 @@ export const GlobalCompetency: React.FC = () => {
             </div>
 
             {/* Interior Canvas Directly BELOW the Divider */}
-            <div className={`flex-1 flex flex-col bg-white ${rightCardTab === 'chatbox' ? 'p-3 overflow-hidden' : 'p-5 gap-4 overflow-y-auto custom-scrollbar'}`}>
+            <div className="flex-1 flex flex-col bg-white p-0 min-h-0 relative">
+              <OverlayScrollbarBox className="h-full w-full flex-1" paddingClassName="p-5">
               
 
 
@@ -2352,6 +2354,7 @@ export const GlobalCompetency: React.FC = () => {
                   <FreeformCopilotChat moduleType="longterm" onGuideActionClick={handleGuideActionClick} />
                 </div>
               )}
+              </OverlayScrollbarBox>
             </div>
 
           </div>

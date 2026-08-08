@@ -195,6 +195,7 @@ export interface SummativeNextSteps {
 
 export interface SummativeSchema {
   projectId: string;
+  date?: string;
   grade: string;
   isAutoCalculated?: boolean;
   originalFeedbackText: string;

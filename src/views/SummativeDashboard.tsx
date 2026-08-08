@@ -7,6 +7,7 @@ import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
 import { FreeformCopilotChat } from '../components/chat/FreeformCopilotChat';
 import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade } from '../utils/geminiService';
+import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 const getContributionRange = (scoreStr: string, weightPct: number) => {
   const clean = scoreStr.toLowerCase();
@@ -199,6 +200,9 @@ export const SummativeDashboard: React.FC = () => {
       if (parsed.globalSummary) {
         parsed.globalSummary = alignGlobalSummaryWithGrade(parsed.globalSummary, parsed.grade === '?' ? '' : parsed.grade);
       }
+
+      const now = new Date();
+      parsed.date = parsed.date || `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
 
       setSummativeFeedbackData(parsed);
       setIsEditing(false);
@@ -456,7 +460,7 @@ export const SummativeDashboard: React.FC = () => {
       <div className="w-full max-w-[1530px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch flex-1 min-h-[600px]">
 
         {/* LEFT COLUMN: Pending Placeholder OR Hydrated Competency Analytics */}
-        <div className={`flex flex-col ${!summativeFeedbackData ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-120px)] min-h-[500px]'}`}>
+        <div className={`flex flex-col ${!summativeFeedbackData ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
           {!summativeFeedbackData ? (
             /* Left Pending Slate */
             <div className="p-8 bg-white border border-slate-200/90 rounded-2xl shadow-xs flex flex-col items-center justify-center text-center gap-4 h-full min-h-[500px] font-sf-pro">
@@ -509,10 +513,10 @@ export const SummativeDashboard: React.FC = () => {
               </div>
 
               {/* Contents Viewport */}
-              <div className="flex-1 p-3 min-h-0 relative select-none overflow-x-hidden">
+              <div className="flex-1 p-0 min-h-0 relative select-none">
                 {activeLeftTab === 'briefing' ? (
-                <div className="flex flex-col gap-2.5 h-full overflow-hidden">
-                  <div onScroll={handleScrollTrigger} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-3 scrollbar-gemini-overlay">
+                <OverlayScrollbarBox className="h-full" paddingClassName="p-5">
+                  <div className="flex flex-col gap-2.5 min-h-full pb-2">
                     {/* Executive Dashboard Overview */}
                     {!isOverviewExpanded ? (
                       /* Collapsed Dashboard Bar */
@@ -768,9 +772,8 @@ export const SummativeDashboard: React.FC = () => {
                         });
                       })()}
                     </div>
-
                   </div>
-                </div>
+                </OverlayScrollbarBox>
                 ) : (
                   /* Next Step — Dual-Group Recommendations View (Formative Todo List style architecture) */
                   <div className="flex flex-col justify-between h-full overflow-hidden select-text">
@@ -818,9 +821,10 @@ export const SummativeDashboard: React.FC = () => {
                         : defaultExplorations;
 
                       return (
-                        <>
+                        <div className="flex flex-col justify-between h-full gap-2 min-h-0">
                           {/* Scrollable Generated Cards List */}
-                          <div onScroll={handleScrollTrigger} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-gemini-overlay flex flex-col gap-6 text-left py-1">
+                          <OverlayScrollbarBox className="flex-1 min-h-0" paddingClassName="px-5 pt-5 pb-1">
+                            <div className="flex flex-col gap-6 text-left py-1">
                             {/* GROUP 1: Academic Actionable Recommendations */}
                             <div ref={academicInsightsRef} className="flex flex-col gap-3">
                               <div className="flex items-center justify-between">
@@ -1231,91 +1235,94 @@ export const SummativeDashboard: React.FC = () => {
                               </div>
                             )}
                           </div>
+                        </OverlayScrollbarBox>
 
                           {/* Pinned Bottom Dock: CUSTOM ENTRY CREATION TOOLBAR */}
-                          <div className="pt-2.5 border-t border-slate-150 flex-shrink-0 flex flex-col gap-2">
-                            {/* Header row: Dual-Type Selector Pills (Left) + Add Button (Right) */}
-                            <div className="flex items-center justify-between gap-2">
-                              {/* Dual-Type Selector Icon Buttons */}
-                              <div className="flex bg-slate-150/80 p-0.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                          <div className="flex-shrink-0 px-5 pb-5 pt-1 select-text bg-white">
+                            <div className="border-t border-slate-100 pt-2.5 flex flex-col gap-2">
+                              {/* Header row: Dual-Type Selector Pills (Left) + Add Button (Right) */}
+                              <div className="flex items-center justify-between gap-2">
+                                {/* Dual-Type Selector Icon Buttons */}
+                                <div className="flex bg-slate-150/80 p-0.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomType('note')}
+                                    title="Academic Note"
+                                    className={`py-1 px-2.5 rounded-md transition-[background-color,shadow,color] duration-200 cursor-pointer flex items-center gap-1.5 ${
+                                      customType === 'note'
+                                        ? 'bg-white text-brand-summative-primary shadow-2xs font-extrabold'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                                    }`}
+                                  >
+                                    <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${customType === 'note' ? 'text-brand-summative-primary' : 'text-slate-500'}`} />
+                                    <span className={`text-[11px] font-sf-pro ${customType === 'note' ? 'font-extrabold text-brand-summative-primary' : 'font-semibold text-slate-600'}`}>
+                                      Note
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomType('plan')}
+                                    title="Long-Term Plan"
+                                    className={`py-1 px-2.5 rounded-md transition-[background-color,shadow,color] duration-200 cursor-pointer flex items-center gap-1.5 ${
+                                      customType === 'plan'
+                                        ? 'bg-white text-brand-summative-primary shadow-2xs font-extrabold'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                                    }`}
+                                  >
+                                    <Rocket className={`w-3.5 h-3.5 flex-shrink-0 ${customType === 'plan' ? 'text-brand-summative-primary' : 'text-slate-500'}`} />
+                                    <span className={`text-[11px] font-sf-pro ${customType === 'plan' ? 'font-extrabold text-brand-summative-primary' : 'font-semibold text-slate-600'}`}>
+                                      Plan
+                                    </span>
+                                  </button>
+                                </div>
+
+                                {/* Add Button */}
                                 <button
                                   type="button"
-                                  onClick={() => setCustomType('note')}
-                                  title="Academic Note"
-                                  className={`py-1 px-2.5 rounded-md transition-[background-color,shadow,color] duration-200 cursor-pointer flex items-center gap-1.5 ${
-                                    customType === 'note'
-                                      ? 'bg-white text-brand-summative-primary shadow-2xs font-extrabold'
-                                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                                  }`}
+                                  onClick={handleAddCustomEntrySubmit}
+                                  className="py-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-sf-pro font-semibold shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-[1.01] active:scale-[0.99]"
                                 >
-                                  <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${customType === 'note' ? 'text-brand-summative-primary' : 'text-slate-500'}`} />
-                                  <span className={`text-[11px] font-sf-pro ${customType === 'note' ? 'font-extrabold text-brand-summative-primary' : 'font-semibold text-slate-600'}`}>
-                                    Note
-                                  </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setCustomType('plan')}
-                                  title="Long-Term Plan"
-                                  className={`py-1 px-2.5 rounded-md transition-[background-color,shadow,color] duration-200 cursor-pointer flex items-center gap-1.5 ${
-                                    customType === 'plan'
-                                      ? 'bg-white text-brand-summative-primary shadow-2xs font-extrabold'
-                                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                                  }`}
-                                >
-                                  <Rocket className={`w-3.5 h-3.5 flex-shrink-0 ${customType === 'plan' ? 'text-brand-summative-primary' : 'text-slate-500'}`} />
-                                  <span className={`text-[11px] font-sf-pro ${customType === 'plan' ? 'font-extrabold text-brand-summative-primary' : 'font-semibold text-slate-600'}`}>
-                                    Plan
-                                  </span>
+                                  <span>{customType === 'note' ? 'Add Note' : 'Add Plan'}</span>
                                 </button>
                               </div>
 
-                              {/* Add Button */}
-                              <button
-                                type="button"
-                                onClick={handleAddCustomEntrySubmit}
-                                className="py-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-sf-pro font-semibold shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 hover:scale-[1.01] active:scale-[0.99]"
-                              >
-                                <span>{customType === 'note' ? 'Add Note' : 'Add Plan'}</span>
-                              </button>
-                            </div>
-
-                            {/* Row 1: Title Input (flex-1) + Tag Input (w-36 sm:w-40 flex-shrink-0) */}
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                placeholder={customType === 'note' ? "Note Title..." : "Plan Goal Title..."}
-                                value={customTitle}
-                                onChange={(e) => setCustomTitle(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEntrySubmit()}
-                                className="flex-1 font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20"
-                              />
-                              <input
-                                type="text"
-                                placeholder="Set category..."
-                                value={customTag}
-                                onChange={(e) => setCustomTag(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEntrySubmit()}
-                                className="w-36 sm:w-40 font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20 capitalize flex-shrink-0"
-                              />
-                            </div>
-
-                            {/* Row 2: Detailed Description Textarea */}
-                            <textarea
-                              placeholder={customType === 'note' ? "Detailed Context (Key takeaway or guidance note)..." : "Detailed Context (Exploration action scope)..."}
-                              value={customContent}
-                              onChange={(e) => setCustomContent(e.target.value)}
-                              className="w-full font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20 h-14 resize-none leading-relaxed"
-                            />
-
-                            {addedSuccessToast && (
-                              <div className="text-[10.5px] font-heading font-extrabold text-[#1A73E8] animate-in fade-in flex items-center gap-1 pt-0.5">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>{addedSuccessToast}</span>
+                              {/* Row 1: Title Input (flex-1) + Tag Input (w-36 sm:w-40 flex-shrink-0) */}
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder={customType === 'note' ? "Note Title..." : "Plan Goal Title..."}
+                                  value={customTitle}
+                                  onChange={(e) => setCustomTitle(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEntrySubmit()}
+                                  className="flex-1 font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Set category..."
+                                  value={customTag}
+                                  onChange={(e) => setCustomTag(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEntrySubmit()}
+                                  className="w-36 sm:w-40 font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20 capitalize flex-shrink-0"
+                                />
                               </div>
-                            )}
+
+                              {/* Row 2: Detailed Description Textarea */}
+                              <textarea
+                                placeholder={customType === 'note' ? "Detailed Context (Key takeaway or guidance note)..." : "Detailed Context (Exploration action scope)..."}
+                                value={customContent}
+                                onChange={(e) => setCustomContent(e.target.value)}
+                                className="w-full font-body text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20 h-14 resize-none leading-relaxed"
+                              />
+
+                              {addedSuccessToast && (
+                                <div className="text-[10.5px] font-heading font-extrabold text-[#1A73E8] animate-in fade-in flex items-center gap-1 pt-0.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>{addedSuccessToast}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </>
+                        </div>
                       );
                     })()}
                   </div>
@@ -1327,7 +1334,7 @@ export const SummativeDashboard: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: Feedback Input Panel OR Hydrated Original Text Viewer & Chatbox Container */}
-        <div className={`flex flex-col ${!summativeFeedbackData || isEditing || activeRightTab === 'input' ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-120px)] min-h-[500px]'}`}>
+        <div className={`flex flex-col ${!summativeFeedbackData || isEditing || activeRightTab === 'input' ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
           {!summativeFeedbackData || isEditing || activeRightTab === 'input' ? (
             /* Right Input Panel */
             <div className="h-full flex-1 flex flex-col justify-between p-6 bg-white border border-slate-200/90 rounded-2xl shadow-xs relative overflow-hidden font-sf-pro">
@@ -1495,7 +1502,7 @@ export const SummativeDashboard: React.FC = () => {
               </div>
 
               {/* Tab Contents Viewport */}
-              <div className={`flex-1 min-h-0 relative select-none ${activeRightTab === 'document' ? 'p-0' : 'p-4'}`}>
+              <div className={`flex-1 min-h-0 relative select-none ${activeRightTab === 'transcript' || activeRightTab === 'document' ? 'p-0' : 'p-5'}`}>
                 <div className={`h-full ${activeRightTab === 'transcript' ? 'block' : 'hidden'}`}>
                   <OriginalTextPanel
                     originalText={summativeFeedbackData.originalFeedbackText}

@@ -127,8 +127,33 @@
   animation: flash-once 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1 forwards;
 }
 
-/* True Gemini-Style Floating Overlay Scrollbar */
-.scrollbar-gemini-overlay {
+/* Universal Platform-Wide Scrollbar Standard (Unified with Summative Briefing Overlay Standard) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 0px; /* Hide horizontal scrollbar completely */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.75);
+}
+
+/* Custom Scrollbar Utility Unification */
+.custom-scrollbar,
+.scrollbar-thin {
   overflow-y: overlay !important;
   overflow-x: hidden !important;
   scroll-behavior: smooth;
@@ -138,33 +163,25 @@
 }
 
 @supports not (overflow: overlay) {
-  .scrollbar-gemini-overlay {
+  .custom-scrollbar,
+  .scrollbar-thin {
     overflow-y: auto !important;
   }
 }
 
-.scrollbar-gemini-overlay::-webkit-scrollbar {
-  width: 5px;
-  height: 0px; /* Hide horizontal scrollbar completely */
-}
-
-.scrollbar-gemini-overlay::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-gemini-overlay::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 9999px;
-  transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Scroll-triggered and Hover visibility */
-.scrollbar-gemini-overlay:hover::-webkit-scrollbar-thumb,
-.scrollbar-gemini-overlay.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.45);
+.custom-scrollbar.is-scrolling,
+.scrollbar-thin.is-scrolling {
   scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
 }
 
-.scrollbar-gemini-overlay::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(100, 116, 139, 0.75);
+/* Hide native scrollbar utility for custom overlay scrollbar wrapper */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }

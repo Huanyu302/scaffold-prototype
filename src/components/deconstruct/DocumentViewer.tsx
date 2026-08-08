@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore, FileLocationAnchor } from '../../store/useAppStore';
 import { FileText, AlertCircle, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { OverlayScrollbarBox } from '../common/OverlayScrollbarBox';
 
 interface DocumentViewerProps {
   feedbackType: 'formative' | 'summative';
@@ -265,11 +266,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     };
   }, [loadedPdfState]);
 
-  // Reset zoom when switching active file
+  // Reset zoom and ensure initial scroll starts from top (scrollTop = 0)
   useEffect(() => {
     setZoomLevel(1.0);
     setRenderedZoom(1.0);
-  }, [activeFileId]);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [activeFileId, activeRightTab]);
 
   // Default tab selection fallback
   useEffect(() => {
@@ -446,11 +450,17 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
     // 2. Perform smooth scroll alignment inside unified container
     setTimeout(() => {
+      lastScrolledContextRef.current = timestamp;
+      if (anchor.pageNumber <= 1) {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+        return;
+      }
       const element = document.getElementById(`doc-page-${anchor.pageNumber}`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-      lastScrolledContextRef.current = timestamp;
     }, 150);
   };
 
@@ -526,7 +536,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
       {/* Browser-like Tab Switching Bar */}
       {materialsList.length > 0 && (
-        <div className="flex bg-slate-100/60 border-b border-slate-200/85 px-2 pt-1.5 select-none overflow-x-auto no-scrollbar flex-shrink-0">
+        <div className="flex bg-slate-100/60 border-b border-slate-200/85 px-4 pt-1.5 select-none overflow-x-auto no-scrollbar flex-shrink-0">
           {materialsList.map((m) => {
             const isActive = m.id === activeFileId;
 
@@ -601,10 +611,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
       {/* Pages Container Box (Client-side rendered Canvas pages or Stylized fallbacks) */}
       {currentPdfDoc ? (
-        <div
+        <OverlayScrollbarBox
           key={activeFile?.id || 'pdf-container'}
-          ref={scrollContainerRef}
-          className="flex-1 overflow-auto p-1.5 space-y-3 scroll-smooth bg-slate-100 flex flex-col items-center transition-opacity duration-200 animate-in fade-in duration-200"
+          containerRef={scrollContainerRef}
+          className="flex-1 bg-slate-100/80"
+          paddingClassName="px-2 pt-4 pb-6 flex flex-col items-center justify-start space-y-4"
         >
           {Array.from({ length: currentNumPages }).map((_, i) => {
             const pageNum = i + 1;
@@ -614,10 +625,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               <div
                 key={`${activeFile.id}-p-${pageNum}`}
                 id={`doc-page-${pageNum}`}
-                className="relative bg-white shadow-sm rounded-lg p-0.5 border border-slate-200 transition-transform duration-75"
+                className="relative bg-white shadow-sm rounded-lg p-0.5 border border-slate-200 transition-transform duration-75 max-w-full"
                 style={{
-                  width: `${renderedZoom * 100}%`,
-                  maxWidth: 'none',
+                  width: '100%',
                   transform: visualScale !== 1.0 ? `scale(${visualScale})` : undefined,
                   transformOrigin: 'top center'
                 }}
@@ -630,7 +640,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               </div>
             );
           })}
-        </div>
+        </OverlayScrollbarBox>
       ) : (
         <div
           key={activeFile?.id || 'non-pdf-container'}
