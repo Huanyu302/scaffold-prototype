@@ -211,6 +211,17 @@ export const SummativeDashboard: React.FC = () => {
     }
   };
 
+  const handleScrollTrigger = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    target.classList.add('is-scrolling');
+    if ((target as any)._scrollTimeout) {
+      clearTimeout((target as any)._scrollTimeout);
+    }
+    (target as any)._scrollTimeout = setTimeout(() => {
+      target.classList.remove('is-scrolling');
+    }, 1000);
+  };
+
   if (!activeProject) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4 p-6 text-center animate-in fade-in duration-300">
@@ -501,7 +512,7 @@ export const SummativeDashboard: React.FC = () => {
               <div className="flex-1 p-3 min-h-0 relative select-none overflow-x-hidden">
                 {activeLeftTab === 'briefing' ? (
                 <div className="flex flex-col gap-2.5 h-full overflow-hidden">
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-3 pr-1 scrollbar-hover-only">
+                  <div onScroll={handleScrollTrigger} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-3 scrollbar-gemini-overlay">
                     {/* Executive Dashboard Overview */}
                     {!isOverviewExpanded ? (
                       /* Collapsed Dashboard Bar */
@@ -809,7 +820,7 @@ export const SummativeDashboard: React.FC = () => {
                       return (
                         <>
                           {/* Scrollable Generated Cards List */}
-                          <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1 scrollbar-hover-only flex flex-col gap-6 text-left py-1">
+                          <div onScroll={handleScrollTrigger} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-gemini-overlay flex flex-col gap-6 text-left py-1">
                             {/* GROUP 1: Academic Actionable Recommendations */}
                             <div ref={academicInsightsRef} className="flex flex-col gap-3">
                               <div className="flex items-center justify-between">

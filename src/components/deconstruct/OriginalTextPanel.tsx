@@ -294,7 +294,17 @@ export const OriginalTextPanel: React.FC<OriginalTextPanelProps> = ({
       {/* Main Text Container Box */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden pt-3 scroll-smooth scrollbar-hover-only pr-1"
+        onScroll={(e) => {
+          const target = e.currentTarget;
+          target.classList.add('is-scrolling');
+          if ((target as any)._scrollTimeout) {
+            clearTimeout((target as any)._scrollTimeout);
+          }
+          (target as any)._scrollTimeout = setTimeout(() => {
+            target.classList.remove('is-scrolling');
+          }, 1000);
+        }}
+        className="flex-1 overflow-y-auto overflow-x-hidden pt-3 scroll-smooth scrollbar-gemini-overlay"
       >
         {paragraphs.map((p) => (
           <ParagraphRow

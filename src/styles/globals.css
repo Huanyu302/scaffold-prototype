@@ -127,49 +127,44 @@
   animation: flash-once 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1 forwards;
 }
 
-/* Overlay floating scrollbar that floats on top of content without affecting layout */
-.scrollbar-hover-only {
+/* True Gemini-Style Floating Overlay Scrollbar */
+.scrollbar-gemini-overlay {
   overflow-y: overlay !important;
   overflow-x: hidden !important;
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox default hidden */
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s ease;
 }
 
-/* Fallback for browsers that don't support overlay keyword */
-@supports not (overflow-y: overlay) {
-  .scrollbar-hover-only {
+@supports not (overflow: overlay) {
+  .scrollbar-gemini-overlay {
     overflow-y: auto !important;
   }
 }
 
-.scrollbar-hover-only::-webkit-scrollbar {
-  width: 0px !important;
-  height: 0px !important;
+.scrollbar-gemini-overlay::-webkit-scrollbar {
+  width: 5px;
+  height: 0px; /* Hide horizontal scrollbar completely */
+}
+
+.scrollbar-gemini-overlay::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.scrollbar-hover-only:hover {
-  scrollbar-width: thin;
+.scrollbar-gemini-overlay::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scroll-triggered and Hover visibility */
+.scrollbar-gemini-overlay:hover::-webkit-scrollbar-thumb,
+.scrollbar-gemini-overlay.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
   scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
 }
 
-.scrollbar-hover-only:hover::-webkit-scrollbar {
-  width: 4px !important;
-}
-
-.scrollbar-hover-only::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-hover-only::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 9999px;
-}
-
-.scrollbar-hover-only:hover::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-}
-
-.scrollbar-hover-only::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+.scrollbar-gemini-overlay::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.75);
 }
