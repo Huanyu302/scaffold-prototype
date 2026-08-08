@@ -127,11 +127,19 @@
   animation: flash-once 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1 forwards;
 }
 
-/* Custom smooth scrollbar that appears ONLY when scrolling/hovering */
+/* Overlay floating scrollbar that floats on top of content without affecting layout */
 .scrollbar-hover-only {
+  overflow-y: overlay !important;
   overflow-x: hidden !important;
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox default hidden */
+}
+
+/* Fallback for browsers that don't support overlay keyword */
+@supports not (overflow-y: overlay) {
+  .scrollbar-hover-only {
+    overflow-y: auto !important;
+  }
 }
 
 .scrollbar-hover-only::-webkit-scrollbar {
@@ -146,7 +154,7 @@
 }
 
 .scrollbar-hover-only:hover::-webkit-scrollbar {
-  width: 5px !important;
+  width: 4px !important;
 }
 
 .scrollbar-hover-only::-webkit-scrollbar-track {
