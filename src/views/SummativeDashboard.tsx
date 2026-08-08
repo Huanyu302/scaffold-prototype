@@ -6,7 +6,7 @@ import { ScoreBarGroup } from '../components/deconstruct/ScoreBarGroup';
 import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
 import { FreeformCopilotChat } from '../components/chat/FreeformCopilotChat';
-import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade } from '../utils/geminiService';
+import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade, formatDimensionTitle } from '../utils/geminiService';
 import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 const getContributionRange = (scoreStr: string, weightPct: number) => {
@@ -258,8 +258,8 @@ export const SummativeDashboard: React.FC = () => {
   const getScoreBadgeClass = (scoreStr: string): string => {
     const clean = scoreStr.toLowerCase();
 
-    const distinctionPill = 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
-    const meritPill = 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
+    const distinctionPill = 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
+    const meritPill = 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const passPill = 'bg-[#FEF7E0] text-[#B06000] border border-[#FDE293] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const focusPill = 'bg-[#FCE8E6] text-[#C5221F] border border-[#FAD2CF] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
 
@@ -347,14 +347,14 @@ export const SummativeDashboard: React.FC = () => {
       const num = parseInt(numMatch[1]);
       if (num >= 70) {
         return {
-          container: 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]',
-          pulse: 'bg-emerald-400/10'
+          container: 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC]',
+          pulse: 'bg-blue-400/10'
         };
       }
       if (num >= 60) {
         return {
-          container: 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC]',
-          pulse: 'bg-blue-400/10'
+          container: 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]',
+          pulse: 'bg-emerald-400/10'
         };
       }
       if (num >= 50) {
@@ -372,8 +372,8 @@ export const SummativeDashboard: React.FC = () => {
     if (clean.includes('distinction') || clean.includes('excellent') || clean.includes('outstanding') || clean.includes('green') || clean.includes('a')) {
       if (!clean.includes('fail') && !clean.includes('poor')) {
         return {
-          container: 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]',
-          pulse: 'bg-emerald-400/10'
+          container: 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC]',
+          pulse: 'bg-blue-400/10'
         };
       }
     }
@@ -381,8 +381,8 @@ export const SummativeDashboard: React.FC = () => {
     if (clean.includes('merit') || clean.includes('good') || clean.includes('b')) {
       if (!clean.includes('fail') && !clean.includes('poor')) {
         return {
-          container: 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC]',
-          pulse: 'bg-blue-400/10'
+          container: 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]',
+          pulse: 'bg-emerald-400/10'
         };
       }
     }
@@ -625,7 +625,7 @@ export const SummativeDashboard: React.FC = () => {
                                 <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
                                   <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
                                     <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
-                                      {scoreItem.dimension}
+                                      {formatDimensionTitle(scoreItem.dimension)}
                                     </span>
                                     {scoreItem.weight && (
                                       <span className="font-semibold text-slate-700 flex-shrink-0 self-center">

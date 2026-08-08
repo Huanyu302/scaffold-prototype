@@ -17,6 +17,40 @@ export interface SubScoreItem {
   score: string;
 }
 
+export function formatDimensionTitle(dimension: string): string {
+  if (!dimension) return '';
+  const minorWords = new Set(['and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'a', 'an', 'the']);
+  
+  return dimension
+    .trim()
+    .split(/\s+/)
+    .map((word, idx, arr) => {
+      if (!word) return '';
+      // Preserve uppercase acronyms e.g. "UX", "UI", "AI", "APA"
+      if (/^[A-Z0-9&/\-+]+$/.test(word) && word.length > 1 && word.toUpperCase() === word) {
+        return word;
+      }
+      
+      const lower = word.toLowerCase();
+      
+      // Handle hyphenated words (e.g. "Problem-Solving", "Intimacy-Health")
+      if (word.includes('-')) {
+        return word
+          .split('-')
+          .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : '')
+          .join('-');
+      }
+      
+      // Minor words stay lowercase in middle of phrase, except first/last word
+      if (idx > 0 && idx < arr.length - 1 && minorWords.has(lower)) {
+        return lower;
+      }
+      
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
 export function calculateWeightedGrade(subScores?: SubScoreItem[] | null): string | null {
   if (!subScores || !Array.isArray(subScores) || subScores.length === 0) {
     return null;
@@ -969,6 +1003,12 @@ Task: Cross-examine the instructor's remarks against these documents to ground y
     if (parsed && Array.isArray(parsed.coreKeyPoints) && parsed.coreKeyPoints.length > 0) {
       sanitizeKeyPointSeverities(parsed.coreKeyPoints);
       if (parsed.briefingOverview) {
+        if (parsed.briefingOverview.subScores && Array.isArray(parsed.briefingOverview.subScores)) {
+          parsed.briefingOverview.subScores = parsed.briefingOverview.subScores.map(s => ({
+            ...s,
+            dimension: formatDimensionTitle(s.dimension)
+          }));
+        }
         parsed.briefingOverview.metrics = {
           redCount: parsed.coreKeyPoints.filter(k => k.severity === 'critical').length,
           yellowCount: parsed.coreKeyPoints.filter(k => k.severity === 'moderate').length,
@@ -1938,7 +1978,7 @@ export const generateMockSummativeParsedResponse = (
     isAutoCalculated,
     originalFeedbackText: rawText,
     globalSummary,
-    subScores: subScores.length > 0 ? subScores : null,
+    subScores: subScores.length > 0 ? subScores.map(s => ({ ...s, dimension: formatDimensionTitle(s.dimension) })) : null,
     keyStrengths,
     areasForImprovement,
     nextSteps: {
