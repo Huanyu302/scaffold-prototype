@@ -294,7 +294,7 @@ export const OriginalTextPanel: React.FC<OriginalTextPanelProps> = ({
       {/* Main Text Container Box */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-y-auto pt-3 scroll-smooth scrollbar-thin pr-1"
+        className="flex-1 overflow-y-auto overflow-x-hidden pt-3 scroll-smooth scrollbar-hover-only pr-1"
       >
         {paragraphs.map((p) => (
           <ParagraphRow

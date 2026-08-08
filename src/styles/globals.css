@@ -126,3 +126,38 @@
 .animate-flash-once {
   animation: flash-once 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1 forwards;
 }
+
+/* Custom smooth scrollbar that appears only when scrolling/hovering */
+.scrollbar-hover-only {
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s ease;
+}
+
+.scrollbar-hover-only:hover {
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.scrollbar-hover-only::-webkit-scrollbar {
+  width: 5px;
+  height: 0px; /* Hide horizontal scrollbar completely */
+}
+
+.scrollbar-hover-only::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-hover-only::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.3s ease;
+}
+
+.scrollbar-hover-only:hover::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.scrollbar-hover-only::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.65);
+}
