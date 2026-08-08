@@ -498,14 +498,14 @@ export const SummativeDashboard: React.FC = () => {
               </div>
 
               {/* Contents Viewport */}
-              <div className="flex-1 p-4 min-h-0 relative select-none">
+              <div className="flex-1 p-3 min-h-0 relative select-none">
                 {activeLeftTab === 'briefing' ? (
                 <div className="flex flex-col gap-3 h-full overflow-hidden">
-                  <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1 scrollbar-thin">
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-3 pr-1 scrollbar-thin">
                     {/* Executive Dashboard Overview */}
                     {!isOverviewExpanded ? (
                       /* Collapsed Dashboard Bar */
-                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-2.5 shadow-sm h-11 box-border flex items-center justify-between gap-4 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
+                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-2.5 shadow-sm h-11 box-border flex items-center justify-between gap-3 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Grade</span>
                           {(() => {
@@ -539,7 +539,7 @@ export const SummativeDashboard: React.FC = () => {
                       </div>
                     ) : (
                       /* Real Briefing Card */
-                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-4 shadow-sm min-h-[160px] h-auto box-border flex flex-col justify-between gap-3.5 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
+                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-3.5 shadow-sm min-h-[140px] h-auto box-border flex flex-col justify-between gap-3 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
                         <div className="flex justify-between items-center w-full">
                           <div className="flex items-center gap-1.5 select-none">
                             <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none whitespace-nowrap">Grade</span>
@@ -607,7 +607,7 @@ export const SummativeDashboard: React.FC = () => {
                           {summativeFeedbackData.subScores && summativeFeedbackData.subScores.length > 0 ? (
                             <div className="flex flex-col gap-1 bg-slate-50/50 border border-slate-100 rounded-lg p-2 animate-in fade-in duration-300">
                               {summativeFeedbackData.subScores.map((scoreItem, sIdx) => (
-                                <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
+                                <div key={sIdx} className="flex justify-between items-center gap-2 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
                                   <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
                                     <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
                                       {scoreItem.dimension}
@@ -628,14 +628,14 @@ export const SummativeDashboard: React.FC = () => {
                         </div>
 
                         {/* Outcomes Metrics Badges (Interactive Buttons) */}
-                        <div className="flex items-center justify-start gap-2.5 w-full border-t border-slate-100/60 pt-2 flex-shrink-0 select-none">
+                        <div className="flex items-center justify-start gap-2 w-full border-t border-slate-100/60 pt-2 flex-shrink-0 select-none">
                           <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal mr-1 select-none whitespace-nowrap">Outcomes</span>
 
                           <button
                             onClick={() => {
                               setOutcomeFilter(outcomeFilter === 'good' ? null : 'good');
                             }}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-heading font-bold cursor-pointer whitespace-nowrap border ${outcomeFilter === 'good'
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-bold cursor-pointer whitespace-nowrap border ${outcomeFilter === 'good'
                                 ? 'border-emerald-400 bg-[#CEEAD6]/60 text-emerald-900 shadow-2xs'
                                 : outcomeFilter
                                   ? 'border-emerald-200/30 bg-[#EBF4F0]/40 text-emerald-700/40 opacity-40'
@@ -651,7 +651,7 @@ export const SummativeDashboard: React.FC = () => {
                             onClick={() => {
                               setOutcomeFilter(outcomeFilter === 'bad' ? null : 'bad');
                             }}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-heading font-bold cursor-pointer whitespace-nowrap border ${outcomeFilter === 'bad'
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-bold cursor-pointer whitespace-nowrap border ${outcomeFilter === 'bad'
                                 ? 'border-amber-400 bg-amber-100/70 text-amber-950 shadow-2xs'
                                 : outcomeFilter
                                   ? 'border-amber-200/30 bg-amber-50/30 text-amber-900/40 opacity-40'
@@ -665,8 +665,8 @@ export const SummativeDashboard: React.FC = () => {
                         </div>
 
                         {/* Bottom Row: globalSummary text container (Flexible Height) */}
-                        <div className="border-t border-slate-150 pt-3 select-text flex-shrink-0">
-                          <p className="text-[11.5px] text-slate-650 font-sf-pro leading-loose block break-words text-left">
+                        <div className="border-t border-slate-150 pt-2.5 select-text flex-shrink-0">
+                          <p className="text-[11.5px] text-slate-650 font-sf-pro leading-relaxed block break-words text-left">
                             {alignGlobalSummaryWithGrade(summativeFeedbackData.globalSummary, summativeFeedbackData.grade === '?' ? '' : summativeFeedbackData.grade)}
                           </p>
                         </div>
@@ -674,7 +674,7 @@ export const SummativeDashboard: React.FC = () => {
                     )}
 
                     {/* Key Observations / Insights List (Formative-style layout) */}
-                    <div className="flex flex-col gap-2.5 border-t border-slate-150 pt-4 flex-shrink-0">
+                    <div className="flex flex-col gap-2 border-t border-slate-150 pt-3 flex-shrink-0">
                       {(() => {
                         const combinedObservations = [
                           ...strengths.map(s => ({ ...s, type: 'good' as const })),
@@ -709,19 +709,19 @@ export const SummativeDashboard: React.FC = () => {
                               key={item.id}
                               ref={isFirstItem ? firstKeyPointRef : undefined}
                               onClick={() => handleDimensionHighlight(item.anchor.start, item.anchor.end, item.exactPhrase)}
-                              className={`p-3 border rounded-xl flex justify-between items-center gap-4 ${isSelected
+                              className={`px-3 py-2.5 border rounded-xl flex justify-between items-center gap-2.5 ${isSelected
                                   ? 'border-brand-summative-primary bg-blue-50/20 shadow-2xs'
                                   : 'border-slate-150 bg-white'
                                 }`}
                             >
-                              <div className="flex items-center justify-between gap-3.5 min-w-0 flex-1">
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                              <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
                                   <span className="text-xs font-sf-pro font-semibold text-slate-800 whitespace-normal leading-relaxed">
                                     {item.title}
                                   </span>
                                 </div>
 
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-heading font-bold select-none whitespace-nowrap flex-shrink-0 border ${item.type === 'good'
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-heading font-bold select-none whitespace-nowrap flex-shrink-0 border ${item.type === 'good'
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-150'
                                     : 'bg-amber-50/80 text-amber-800 border-amber-200/70'
                                   }`}>
@@ -737,7 +737,7 @@ export const SummativeDashboard: React.FC = () => {
                                 <div className="relative group/tooltip">
                                   <button
                                     onClick={() => handleDimensionHighlight(item.anchor.start, item.anchor.end, item.exactPhrase)}
-                                    className={`p-1.5 border rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
+                                    className={`p-1 border rounded-md transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
                                       isFirstItem && isFlashingBriefingBtn
                                         ? 'border-[#1A73E8] bg-blue-100 text-blue-700 ring-2 ring-blue-400/80 scale-105 shadow-md animate-flash-once z-20'
                                         : (isSelected
