@@ -1776,6 +1776,7 @@ export const SourceSidebar: React.FC = () => {
                 <button
                   onClick={() => {
                     setRawFeedbackInput('');
+                    useAppStore.setState({ isPreparingNewRound: true, isEditingCurrentRound: false });
                     setActiveRightTab('input');
                   }}
                   className="p-0.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition-all cursor-pointer flex items-center justify-center"

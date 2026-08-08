@@ -53,7 +53,10 @@ export const FormativeSandbox: React.FC = () => {
     rawFeedbackInput,
     setRawFeedbackInput,
     formativeRounds,
-    addNewFeedbackRound
+    addNewFeedbackRound,
+    isEditingCurrentRound,
+    updateCurrentFeedbackRound,
+    isPreparingNewRound
   } = useAppStore();
 
   const [newTodoText, setNewTodoText] = useState('');
@@ -404,6 +407,18 @@ export const FormativeSandbox: React.FC = () => {
   const handleProcessInput = async () => {
     if (!rawFeedbackInput.trim()) return;
 
+    if (isEditingCurrentRound && formativeRounds.length > 0) {
+      setIsProcessing(true);
+      try {
+        await updateCurrentFeedbackRound(rawFeedbackInput);
+      } catch (err) {
+        console.error("Failed to update current feedback round:", err);
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     const existingRoundsCount = formativeRounds.length;
     const prevRoundMaterials = activeProject?.attachedMaterials || [];
 
@@ -660,9 +675,9 @@ export const FormativeSandbox: React.FC = () => {
         {/* ======================================================== */}
         {/* LEFT COLUMN: AI Assistant & Dynamic Tool Workspace Canvas */}
         {/* ======================================================== */}
-        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
+        <div className={`flex flex-col min-w-0 ${!formativeFeedbackData.originalFeedbackText || isPreparingNewRound ? 'gap-6 justify-center min-h-[500px]' : 'h-[calc(100vh-112px)] min-h-[500px]'}`}>
           
-          {!formativeFeedbackData.originalFeedbackText ? (
+          {!formativeFeedbackData.originalFeedbackText || isPreparingNewRound ? (
             /* Idle complete blank state placeholder */
             <div className="p-8 bg-white border border-slate-200/90 rounded-2xl shadow-xs flex flex-col items-center justify-center text-center gap-4 h-full min-h-[500px] font-sf-pro">
               <div className="p-4 bg-cyan-50/50 text-cyan-450 rounded-2xl">
@@ -1124,127 +1139,163 @@ export const FormativeSandbox: React.FC = () => {
                       )
                     ) : null)}
 
-                    {/* Batch Action Bar */}
-                    <div ref={batchActionBarRef} className="flex items-center justify-between pb-2 border-b border-slate-200/70 flex-shrink-0 transition-all duration-300 px-1 pt-1">
-                      <label className="flex items-center gap-2 text-xs font-sf-pro font-semibold text-slate-700 cursor-pointer select-none">
-                        {(() => {
-                          const isAllSelected = filteredKeyPoints.length > 0 && selectedBriefingIds.length === filteredKeyPoints.length;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => toggleSelectAllBriefings(filteredKeyPoints.map(kp => kp.id))}
-                              className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
-                                isAllSelected
-                                  ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
-                                  : 'border-slate-300 bg-white hover:border-brand-formative-primary'
-                              }`}
-                              title={isAllSelected ? 'Deselect all' : 'Select all'}
-                            >
-                              {isAllSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                            </button>
-                          );
-                        })()}
-                        Select All
-                      </label>
-                      
-                      <button
-                        onClick={addSelectedBriefingsToTodo}
-                        disabled={!isFlashingAddTodoBtn && selectedBriefingIds.length === 0}
-                        className={`py-1 px-3 rounded-lg text-[11px] font-sf-pro font-semibold transition-all duration-200 flex items-center gap-1.5 ${
-                          isFlashingAddTodoBtn
-                            ? 'bg-brand-formative-primary text-white ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20 cursor-pointer'
-                            : (selectedBriefingIds.length > 0
-                                ? 'bg-slate-900 text-white shadow-2xs hover:bg-slate-800 cursor-pointer'
-                                : 'bg-slate-100 text-slate-400 cursor-not-allowed')
-                        }`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>{selectedBriefingIds.length > 0 ? `TODO (${selectedBriefingIds.length})` : 'TODO'}</span>
-                      </button>
-                    </div>
-
-                    <div className="flex flex-col gap-2 flex-shrink-0">
-                      {filteredKeyPoints.length === 0 ? (
-                        <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 flex flex-col items-center justify-center gap-1 select-none animate-in fade-in duration-200">
-                          <Layers className="w-8 h-8 text-slate-350 mb-1" />
-                          <p className="text-[10px] font-heading font-bold text-slate-450 uppercase tracking-widest">No matching briefing items</p>
-                          <p className="text-[9px] text-slate-400 font-body">Click the active dashboard tag or filter again to clear filter.</p>
+                    {/* Lower Section: Batch Action Bar & Key Points List */}
+                    {isAIWorking ? (
+                      /* Skeleton Loading Shimmer for Lower Briefing List */
+                      <div className="flex flex-col gap-3 flex-shrink-0 animate-pulse select-none pt-1">
+                        {/* Skeleton Batch Action Bar */}
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 flex-shrink-0 px-1 pt-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-md bg-slate-200" />
+                            <div className="w-16 h-3.5 bg-slate-200 rounded" />
+                          </div>
+                          <div className="w-20 h-7 rounded-lg bg-slate-200" />
                         </div>
-                      ) : (
-                        filteredKeyPoints.map((kp, kpIdx) => {
-                          const isChecked = selectedBriefingIds.includes(kp.id);
-                          const isFlashingAnchor = flashingAnchorIndex === kpIdx;
-                          return (
-                            <div
-                              key={kp.id}
-                              ref={kpIdx === 0 ? firstKeyPointRef : undefined}
-                              className={`p-3 border rounded-xl flex justify-between items-center gap-4 group ${
-                              isChecked
-                                  ? 'border-brand-formative-primary/60 bg-cyan-50/10'
-                                  : 'border-slate-150 bg-white'
-                              }`}
-                              onClick={() => toggleSelectBriefing(kp.id)}
-                            >
-                              <div className="flex items-center justify-between gap-3.5 min-w-0 flex-1">
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleSelectBriefing(kp.id);
-                                    }}
-                                    className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
-                                      isChecked
-                                        ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
-                                        : 'border-slate-300 bg-white hover:border-brand-formative-primary'
-                                    }`}
-                                    title={isChecked ? 'Deselect item' : 'Select item'}
-                                  >
-                                    {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                  </button>
-                                  <span className="text-xs font-sf-pro font-semibold text-slate-800 whitespace-normal leading-relaxed">
-                                    {kp.title}
-                                  </span>
-                                </div>
 
-                                {/* Status Badge (Title Case font-bold, no dot circle) */}
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-heading font-bold select-none whitespace-nowrap flex-shrink-0 border ${
-                                  kp.severity === 'critical'
-                                    ? 'bg-rose-50/60 text-rose-900/80 border-rose-200/50'
-                                    : kp.severity === 'moderate'
-                                    ? 'bg-amber-50 text-amber-700 border-amber-150'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                                }`}>
-                                  <span>{kp.severity === 'critical' ? 'Focus' : kp.severity === 'moderate' ? 'Suggestion' : 'On Track'}</span>
-                                </span>
-                              </div>
-                            
-                            <div 
-                              className="flex items-center space-x-3 flex-shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {/* Read More Tooltip Wrapper */}
-                              <div className="relative group/tooltip">
-                                <button
-                                  onClick={() => handleReadMoreClick(kp.id)}
-                                  className={`p-1.5 border rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                                    isFlashingAnchor
-                                      ? 'border-cyan-500 bg-cyan-100 text-cyan-700 ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20'
-                                      : 'border-slate-200 hover:border-brand-formative-primary/60 hover:text-brand-formative-primary text-slate-500 hover:bg-cyan-50/40 hover:scale-105 active:scale-95'
-                                  }`}
-                                >
-                                  <ArrowRight className={`w-3.5 h-3.5 ${isFlashingAnchor ? 'text-cyan-700 stroke-[2.5]' : ''}`} />
-                                </button>
-                                <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2.5 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
-                                  Read More & Locate Excerpt
+                        {/* Skeleton Item Cards (3 items) */}
+                        <div className="flex flex-col gap-2">
+                          {[1, 2, 3].map((n) => (
+                            <div key={n} className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs flex flex-col gap-2.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 flex-1">
+                                  <div className="w-4 h-4 rounded-md bg-slate-200 flex-shrink-0" />
+                                  <div className="h-4 bg-slate-200 rounded flex-1 max-w-[65%]" />
                                 </div>
+                                <div className="w-16 h-5 rounded-full bg-slate-200 flex-shrink-0" />
+                              </div>
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-50">
+                                <div className="w-32 h-3 bg-slate-150 rounded" />
+                                <div className="w-6 h-6 rounded-lg bg-slate-200 flex-shrink-0" />
                               </div>
                             </div>
-                          </div>
-                          );
-                        })
-                      )}
-                    </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Batch Action Bar */}
+                        <div ref={batchActionBarRef} className="flex items-center justify-between pb-2 border-b border-slate-200/70 flex-shrink-0 transition-all duration-300 px-1 pt-1">
+                          <label className="flex items-center gap-2 text-xs font-sf-pro font-semibold text-slate-700 cursor-pointer select-none">
+                            {(() => {
+                              const isAllSelected = filteredKeyPoints.length > 0 && selectedBriefingIds.length === filteredKeyPoints.length;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSelectAllBriefings(filteredKeyPoints.map(kp => kp.id))}
+                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
+                                    isAllSelected
+                                      ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
+                                      : 'border-slate-300 bg-white hover:border-brand-formative-primary'
+                                  }`}
+                                  title={isAllSelected ? 'Deselect all' : 'Select all'}
+                                >
+                                  {isAllSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                </button>
+                              );
+                            })()}
+                            Select All
+                          </label>
+                          
+                          <button
+                            onClick={addSelectedBriefingsToTodo}
+                            disabled={!isFlashingAddTodoBtn && selectedBriefingIds.length === 0}
+                            className={`py-1 px-3 rounded-lg text-[11px] font-sf-pro font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                              isFlashingAddTodoBtn
+                                ? 'bg-brand-formative-primary text-white ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20 cursor-pointer'
+                                : (selectedBriefingIds.length > 0
+                                    ? 'bg-slate-900 text-white shadow-2xs hover:bg-slate-800 cursor-pointer'
+                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed')
+                            }`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{selectedBriefingIds.length > 0 ? `TODO (${selectedBriefingIds.length})` : 'TODO'}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          {filteredKeyPoints.length === 0 ? (
+                            <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 flex flex-col items-center justify-center gap-1 select-none animate-in fade-in duration-200">
+                              <Layers className="w-8 h-8 text-slate-350 mb-1" />
+                              <p className="text-[10px] font-heading font-bold text-slate-450 uppercase tracking-widest">No matching briefing items</p>
+                              <p className="text-[9px] text-slate-400 font-body">Click the active dashboard tag or filter again to clear filter.</p>
+                            </div>
+                          ) : (
+                            filteredKeyPoints.map((kp, kpIdx) => {
+                              const isChecked = selectedBriefingIds.includes(kp.id);
+                              const isFlashingAnchor = flashingAnchorIndex === kpIdx;
+                              return (
+                                <div
+                                  key={kp.id}
+                                  ref={kpIdx === 0 ? firstKeyPointRef : undefined}
+                                  className={`p-3 border rounded-xl flex justify-between items-center gap-4 group ${
+                                  isChecked
+                                      ? 'border-brand-formative-primary/60 bg-cyan-50/10'
+                                      : 'border-slate-150 bg-white'
+                                  }`}
+                                  onClick={() => toggleSelectBriefing(kp.id)}
+                                >
+                                  <div className="flex items-center justify-between gap-3.5 min-w-0 flex-1">
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleSelectBriefing(kp.id);
+                                        }}
+                                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none flex-shrink-0 ${
+                                          isChecked
+                                            ? 'bg-brand-formative-primary border-brand-formative-primary text-white shadow-2xs'
+                                            : 'border-slate-300 bg-white hover:border-brand-formative-primary'
+                                        }`}
+                                        title={isChecked ? 'Deselect item' : 'Select item'}
+                                      >
+                                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </button>
+                                      <span className="text-xs font-sf-pro font-semibold text-slate-800 whitespace-normal leading-relaxed">
+                                        {kp.title}
+                                      </span>
+                                    </div>
+
+                                    {/* Status Badge (Title Case font-bold, no dot circle) */}
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-heading font-bold select-none whitespace-nowrap flex-shrink-0 border ${
+                                      kp.severity === 'critical'
+                                        ? 'bg-rose-50/60 text-rose-900/80 border-rose-200/50'
+                                        : kp.severity === 'moderate'
+                                        ? 'bg-amber-50 text-amber-700 border-amber-150'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                                    }`}>
+                                      <span>{kp.severity === 'critical' ? 'Focus' : kp.severity === 'moderate' ? 'Suggestion' : 'On Track'}</span>
+                                    </span>
+                                  </div>
+                                
+                                <div 
+                                  className="flex items-center space-x-3 flex-shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Read More Tooltip Wrapper */}
+                                  <div className="relative group/tooltip">
+                                    <button
+                                      onClick={() => handleReadMoreClick(kp.id)}
+                                      className={`p-1.5 border rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                                        isFlashingAnchor
+                                          ? 'border-cyan-500 bg-cyan-100 text-cyan-700 ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20'
+                                          : 'border-slate-200 hover:border-brand-formative-primary/60 hover:text-brand-formative-primary text-slate-500 hover:bg-cyan-50/40 hover:scale-105 active:scale-95'
+                                      }`}
+                                    >
+                                      <ArrowRight className={`w-3.5 h-3.5 ${isFlashingAnchor ? 'text-cyan-700 stroke-[2.5]' : ''}`} />
+                                    </button>
+                                    <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2.5 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
+                                      Read More & Locate Excerpt
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </OverlayScrollbarBox>
               )}
@@ -1576,9 +1627,12 @@ export const FormativeSandbox: React.FC = () => {
                 )}
 
                 <div className="flex gap-3">
-                  {formativeFeedbackData.originalFeedbackText && (
+                  {formativeFeedbackData.originalFeedbackText && !isPreparingNewRound && (
                     <button
-                      onClick={() => setActiveRightTab('transcript')}
+                      onClick={() => {
+                        useAppStore.setState({ isPreparingNewRound: false });
+                        setActiveRightTab('transcript');
+                      }}
                       className="flex-1 py-2 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-sf-pro font-medium text-sm tracking-normal transition-all cursor-pointer text-center"
                     >
                       Cancel

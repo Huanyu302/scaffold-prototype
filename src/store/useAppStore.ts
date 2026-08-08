@@ -359,11 +359,16 @@ export interface AppGlobalState {
   versionHistoryTree: Record<string, VersionHistoryNode>;
   currentVersionId: string;
 
-  // Formative rounds storage
+  // Formative rounds actions
   formativeRounds: FeedbackRoundNode[];
   activeRoundId: string | null;
-  
-  // Universal Interactions
+  isEditingCurrentRound: boolean;
+  setIsEditingCurrentRound: (isEditing: boolean) => void;
+  isPreparingNewRound: boolean;
+  setIsPreparingNewRound: (preparing: boolean) => void;
+  selectFormativeRound: (roundId: string) => void;
+  addNewFeedbackRound: (text: string, syncMaterialIds: string[]) => Promise<void>;
+  updateCurrentFeedbackRound: (text: string) => Promise<void>;
   perspective: 'academic' | 'career';
   highlightedTextRange: { start: number; end: number; exactPhrase?: string; timestamp?: number } | FileLocationAnchor | null;
   activeAnchorContext: { issueId: string; timestamp: number } | null;
@@ -431,10 +436,6 @@ export interface AppGlobalState {
   // Version Tree Actions
   lockBranchAndMerge: (branchId: string, description: string) => void;
   backtrackToVersion: (versionId: string) => void;
-
-  // Formative rounds actions
-  selectFormativeRound: (roundId: string) => void;
-  addNewFeedbackRound: (text: string, syncMaterialIds: string[]) => Promise<void>;
   
   // Common Interactions
   togglePerspective: () => void;
@@ -973,6 +974,10 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
   // Formative rounds storage
   formativeRounds: [],
   activeRoundId: null,
+  isEditingCurrentRound: false,
+  setIsEditingCurrentRound: (isEditing) => set({ isEditingCurrentRound: isEditing }),
+  isPreparingNewRound: false,
+  setIsPreparingNewRound: (preparing) => set({ isPreparingNewRound: preparing }),
 
   // Perspective state
   perspective: 'academic',
@@ -3008,12 +3013,16 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
       activeRoundId: roundId,
       formativeRounds: updatedRounds,
       formativeFeedbackData: formativeData,
+      rawFeedbackInput: targetRound.originalFeedbackText,
       todoList: targetRound.todoList,
       initialTodoList: targetRound.todoList,
       activeProject: activeProject ? {
         ...activeProject,
         attachedMaterials: targetRound.attachedMaterials
-      } : null
+      } : null,
+      activeRightTab: 'chatbox',
+      isPreparingNewRound: false,
+      isEditingCurrentRound: false
     });
   },
 
@@ -3167,6 +3176,119 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
 
     } catch (error) {
       console.error("Failed to add new feedback round:", error);
+    } finally {
+      set({ isAIWorking: false, globalAbortController: null });
+    }
+  },
+
+  updateCurrentFeedbackRound: async (text) => {
+    const activeRoundId = get().activeRoundId;
+    const rounds = get().formativeRounds;
+    const active = get().activeProject;
+    const materials = active?.attachedMaterials || [];
+
+    const controller = new AbortController();
+    set({
+      isAIWorking: true,
+      globalAbortController: controller
+    });
+
+    try {
+      const { courseHandbookText, currentAssignmentText } = compileMaterialTexts(materials);
+      set({ courseHandbookText, currentAssignmentText });
+
+      const parsedResult = await processRawFeedback(
+        text,
+        controller.signal,
+        courseHandbookText || undefined,
+        currentAssignmentText || undefined
+      );
+
+      let searchCursor = 0;
+      const lowerRawText = (text || '').toLowerCase();
+      const mappedKeyPoints = parsedResult.coreKeyPoints.map((kp) => {
+        let start = -1;
+        let end = -1;
+        if (kp.sourceExcerpt) {
+          const excerpt = kp.sourceExcerpt.trim();
+          const lowerExcerpt = excerpt.toLowerCase();
+          let foundIdx = lowerRawText.indexOf(lowerExcerpt, searchCursor);
+          if (foundIdx === -1 && lowerExcerpt.length > 20) {
+            const prefix = lowerExcerpt.slice(0, 20);
+            foundIdx = lowerRawText.indexOf(prefix, searchCursor);
+          }
+          if (foundIdx === -1) {
+            foundIdx = lowerRawText.indexOf(lowerExcerpt, 0);
+          }
+          if (foundIdx === -1 && lowerExcerpt.length > 20) {
+            const prefix = lowerExcerpt.slice(0, 20);
+            foundIdx = lowerRawText.indexOf(prefix, 0);
+          }
+          if (foundIdx !== -1) {
+            start = foundIdx;
+            end = foundIdx + excerpt.length;
+            if (foundIdx >= searchCursor) {
+              searchCursor = end;
+            }
+          }
+        }
+        return {
+          id: kp.id,
+          title: kp.title,
+          summary: "",
+          startOffset: start,
+          endOffset: end,
+          severity: kp.severity,
+          sourceExcerpt: kp.sourceExcerpt,
+          associatedCriterion: kp.associatedCriterion,
+          isOfficialRubric: kp.isOfficialRubric
+        };
+      });
+      sanitizeKeyPointSeverities(mappedKeyPoints as any);
+      mappedKeyPoints.sort((a, b) => {
+        const startA = a.startOffset >= 0 ? a.startOffset : Infinity;
+        const startB = b.startOffset >= 0 ? b.startOffset : Infinity;
+        return startA - startB;
+      });
+
+      const formativeSchemaData = {
+        projectId: active?.projectId || 'proj-default',
+        originalFeedbackText: text,
+        politeFluffRanges: [],
+        coreKeyPoints: mappedKeyPoints,
+        parallelProposals: [],
+        briefingOverview: parsedResult.briefingOverview
+      };
+
+      // Overwrite current active round node in place
+      const updatedRounds = rounds.map(r => {
+        if (r.id === activeRoundId) {
+          return {
+            ...r,
+            originalFeedbackText: text,
+            coreKeyPoints: mappedKeyPoints,
+            briefingOverview: parsedResult.briefingOverview
+          };
+        }
+        return r;
+      });
+
+      set({
+        formativeFeedbackData: formativeSchemaData,
+        formativeRounds: updatedRounds,
+        activeLeftTab: 'briefing',
+        selectedBriefingIds: [],
+        activeRightTab: 'chatbox',
+        isEditingCurrentRound: false
+      });
+    } catch (error: any) {
+      if (error && (error.name === 'AbortError' || error.message?.toLowerCase().includes('abort') || error.message?.toLowerCase().includes('cancel'))) {
+        console.warn("updateCurrentFeedbackRound aborted by student.");
+        set({ isAIWorking: false, globalAbortController: null });
+        return;
+      }
+      console.error("Failed to update current feedback round:", error);
+      throw error;
     } finally {
       set({ isAIWorking: false, globalAbortController: null });
     }

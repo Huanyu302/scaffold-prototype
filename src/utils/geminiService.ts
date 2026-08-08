@@ -669,47 +669,42 @@ function determineAssociatedCriterion(sentence: string, handbookText?: string): 
 export function sanitizeKeyPointSeverities(keyPoints: ParsedKeyPoint[]) {
   if (!Array.isArray(keyPoints)) return;
 
-  // 1. Explicit Title-level Action / Edit / Directive / Critique Keywords in the title
-  const titleCritiqueRegex = /\b(missing|generic|unclear|vague|lack|lacks|unexplained|inconsistent|incomplete|define|specify|integrate|reconcile|address|improve|issue|issues|gap|gaps|problem|problems|question|questions|query|queries|risk|risks|concern|concerns|required|needed|needs|uncertainty|uncertainties|flaw|flaws|limitation|limitations|bias|error|errors|weakness|weaknesses|refine|modify|adjust|expand|elaborate|clarify|add|include|recommend|recommendation|suggestion|suggestions|request|requested)\b/i;
+  // 1. Explicit Praise Title Prefix Modifier (e.g., "Strong Conceptual Problem Framing", "Clear Problem Definition", "Robust Methodology")
+  const titlePraisePrefixRegex = /^(strong|strongly|good|robust|well[-\s]|clear|clearly|excellent|insightful|solid|effective|exceptional|commendable|thorough|smart|promising|accurate|comprehensive|valid|aligned|appropriate)\b/i;
 
-  // 2. Title-level Praise Modifiers or Positive Accomplishment Keywords in the title
-  const titlePraiseRegex = /^(strong|strongly|good|robust|well[-\s]|clear|clearly|excellent|insightful|solid|effective|exceptional|commendable|thorough|smart|promising|accurate|comprehensive|valid|aligned|appropriate)\b/i;
-
-  // 3. Excerpt Level Direct Action Imperatives or Question Marks ONLY (strict regex, excluding passive descriptive words like "addressing")
-  const explicitDirectiveRegex = /\?|\b(you\s+need\s+to|needs?\s+to\s+be|you\s+should|should\s+be|must\s+be|be\s+sure\s+to|please\s+add|make\s+sure\s+to|you\s+must|clarify|consider|explain|elaborate|specify|improve|refine|modify|adjust|expand|unclear|vague|missing|lack|lacks|insufficient|not\s+clear|not\s+explicit|not\s+fully|rather\s+than|requires?|how\s+will|would\s+you|would\s+the|whether|how\s+to)\b/i;
-
-  // 4. Excerpt Level Positive Praise
-  const positivePraiseRegex = /\b(done\s+a\s+strong|well[-\s]framed|well[-\s]defined|well[-\s]structured|clearly\s+scoped|strong\s+contextual|excellent|outstanding|good\s+job|robust|strong\s+analysis|insightful|exceptional|commendable|thoroughly|solid|praised|effective|great\s+progress|is\s+good\s+to\s+see|good\s+rationale|well\s+developed|clearly\s+scoped\s+and\s+has\s+a\s+well[-\s]framed)\b/i;
+  // 2. Undeniable Omission or Defect Keywords in Title (Strict defect words ONLY)
+  const strictDefectTitleRegex = /\b(missing|lacks?|unclear|vague|incomplete|unexplained|inconsistent|flaw|flaws|error|errors|bias|omitted|unaddressed|insufficient)\b/i;
 
   keyPoints.forEach(kp => {
     const title = (kp.title || '').trim();
-    const excerpt = (kp.sourceExcerpt || '').trim();
 
-    // GROUND TRUTH CHECK 1: If title explicitly starts with praise or describes positive accomplishment (e.g. "Strongly Scoped Direction"),
-    // AND the title itself does NOT contain explicit critique/edit words (missing, lack, unclear, improve, specify, expand, etc.),
-    // then the summarized title is the GROUND TRUTH: it IS an "On Track" (minor) praise item!
-    if (titlePraiseRegex.test(title) && !titleCritiqueRegex.test(title)) {
+    // Neutralize academic domain phrases (e.g. "problem framing", "problem definition") so "problem" isn't misread as a defect
+    const titleSanitizedForDefectCheck = title
+      .replace(/\bproblem\s+(framing|definition|statement|understanding|selection|analysis|context)\b/gi, 'academic_domain_term')
+      .replace(/\bresearch\s+problem\b/gi, 'academic_domain_term');
+
+    // RULE 1 (AI Semantic Intelligence Primacy & Praise Lock):
+    // If title starts with a praise modifier (e.g. "Strong Conceptual Problem Framing")
+    // AND does NOT contain explicit omission/defect words (like "missing", "unclear", "lacks"),
+    // then lock as 'minor' (On Track / Green)!
+    if (titlePraisePrefixRegex.test(title) && !strictDefectTitleRegex.test(titleSanitizedForDefectCheck)) {
       kp.severity = 'minor'; // 100% On Track!
       return;
     }
 
-    // GROUND TRUTH CHECK 2: If title explicitly contains a critique / action directive word (e.g. "Expand Pilot Testing", "Unclear Methodology"),
-    // it CANNOT be 'minor' (On Track).
-    if (titleCritiqueRegex.test(title)) {
+    // RULE 2 (One-Way Safety Guardrail ONLY):
+    // Only if title explicitly contains undeniable omission/defect words (e.g. "Missing Literature", "Unclear Methodology"),
+    // prevent it from being mistakenly tagged as 'minor' (On Track).
+    if (strictDefectTitleRegex.test(titleSanitizedForDefectCheck)) {
       if (kp.severity === 'minor') {
         kp.severity = 'moderate'; // Downgrade to Suggestion!
       }
       return;
     }
 
-    // GROUND TRUTH CHECK 3: For neutral titles, check excerpt.
-    const hasExplicitDirective = explicitDirectiveRegex.test(excerpt);
-    const hasPraise = positivePraiseRegex.test(excerpt);
-
-    if (hasPraise && !hasExplicitDirective) {
-      kp.severity = 'minor'; // On Track!
-    } else if (kp.severity === 'minor' && hasExplicitDirective) {
-      kp.severity = 'moderate'; // Suggestion!
+    // RULE 3: Default Trust Policy -> Preserve AI's contextual NLP classification (kp.severity) as-is!
+    if (!kp.severity) {
+      kp.severity = 'moderate';
     }
   });
 }

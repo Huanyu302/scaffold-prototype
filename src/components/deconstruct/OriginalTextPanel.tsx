@@ -287,6 +287,7 @@ export const OriginalTextPanel: React.FC<OriginalTextPanelProps> = ({
                 onEditClick();
               } else if (routeTheme === 'formative') {
                 setRawFeedbackInput(originalText);
+                useAppStore.setState({ isPreparingNewRound: false, isEditingCurrentRound: true });
                 setActiveRightTab('input');
               }
             }}
