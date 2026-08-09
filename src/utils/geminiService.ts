@@ -220,25 +220,32 @@ export function calculateWeightedGrade(subScores?: SubScoreItem[] | null): strin
     return null;
   }
 
-  let totalWeightedScore = 0;
-  let totalWeight = 0;
-  let validCount = 0;
+  interface ParsedItem {
+    dimension: string;
+    weight: number;
+    score: number;
+    hasExplicitPercentOrSlash: boolean;
+  }
+
+  const parsedItems: ParsedItem[] = [];
 
   for (const item of subScores) {
     if (!item.weight || !item.score) return null;
 
-    // Extract percentage/weight number e.g. "25%", "(25%)", "25"
+    // Extract percentage/weight number e.g. "20%", "(20%)", "20"
     const weightMatch = /(\d+(?:\.\d+)?)/.exec(item.weight);
     if (!weightMatch) return null;
     const w = parseFloat(weightMatch[1]);
     if (isNaN(w) || w <= 0) return null;
 
-    // Parse score number (e.g. "72", "88/100", "60-70")
+    // Parse score number (e.g. "15.5", "77.5%", "88/100", "60-70")
     const cleanScore = item.score.toLowerCase().trim();
+    const hasExplicitPercentOrSlash = cleanScore.includes('%') || cleanScore.includes('/');
+
     let s: number | null = null;
 
     const rangeMatch = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/.exec(cleanScore);
-    if (rangeMatch) {
+    if (rangeMatch && !cleanScore.startsWith('-')) {
       s = (parseFloat(rangeMatch[1]) + parseFloat(rangeMatch[2])) / 2;
     } else {
       const slashMatch = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/.exec(cleanScore);
@@ -254,18 +261,50 @@ export function calculateWeightedGrade(subScores?: SubScoreItem[] | null): strin
 
     if (s === null || isNaN(s)) return null;
 
-    totalWeightedScore += s * w;
-    totalWeight += w;
-    validCount++;
+    parsedItems.push({
+      dimension: item.dimension,
+      weight: w,
+      score: s,
+      hasExplicitPercentOrSlash
+    });
   }
 
-  // Require ALL items to be validly parsed and total weight to be positive
-  if (validCount === subScores.length && totalWeight > 0) {
-    const finalScore = Math.round(totalWeightedScore / totalWeight);
-    return `${finalScore}`;
+  if (parsedItems.length !== subScores.length) return null;
+
+  // THREE-STAGE JUDGMENT LOGIC MATRIX:
+  // Determine if scores are already Weighted Points (S_i <= W_i for all items and no explicit %/slash)
+  // Or if they are Raw Unweighted Scores (S_i > W_i for any item, or explicit %/slash)
+  const isWeightedPoints = parsedItems.every(p => !p.hasExplicitPercentOrSlash && p.score <= p.weight);
+
+  let finalScore: number;
+
+  if (isWeightedPoints) {
+    // Scenario A: Weighted Point Scores (e.g. Topic (20%) - 15.5, Evidence (10%) - 6.5)
+    // Simply sum all weighted points directly: Total = sum(S_i)
+    const sumPoints = parsedItems.reduce((acc, p) => acc + p.score, 0);
+    const sumWeights = parsedItems.reduce((acc, p) => acc + p.weight, 0);
+
+    if (sumWeights > 0 && sumWeights < 99) {
+      finalScore = Math.round((sumPoints / sumWeights) * 100);
+    } else {
+      finalScore = Math.round(sumPoints);
+    }
+  } else {
+    // Scenario B: Raw Unweighted Percentage Scores (e.g. Topic (20%) - 77.5, Evidence (10%) - 65)
+    // Calculate weighted average: Total = sum(S_i * W_i) / sum(W_i)
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+
+    for (const p of parsedItems) {
+      totalWeightedScore += p.score * p.weight;
+      totalWeight += p.weight;
+    }
+
+    if (totalWeight <= 0) return null;
+    finalScore = Math.round(totalWeightedScore / totalWeight);
   }
 
-  return null;
+  return `${finalScore}`;
 }
 
 export function ensureMaxFiveWords(str: string): string {
@@ -1990,12 +2029,12 @@ export const generateMockSummativeParsedResponse = (
     const trimmed = line.trim();
     if (!trimmed) return;
     
-    // Pattern 1: Dimension (Weight%): Score
-    const weightMatch = /([^\n\r(]+)\s*\(\s*(\d+%)\s*\)\s*:\s*([^\n\r]+)/i.exec(trimmed);
+    // Pattern 1: Dimension (Weight%): Score or Dimension (Weight%) - Score
+    const weightMatch = /([^\n\r(]+)\s*\(\s*(\d+(?:\.\d+)?%?)\s*\)\s*[:=\-–]?\s*([^\n\r]+)/i.exec(trimmed);
     if (weightMatch) {
       const dimension = weightMatch[1].replace(/^\d+[\s\.)\-]+/, '').trim();
-      const weight = weightMatch[2].trim();
-      const score = weightMatch[3].replace(/[.\s]+$/, '').trim();
+      const weight = weightMatch[2].trim().endsWith('%') ? weightMatch[2].trim() : `${weightMatch[2].trim()}%`;
+      const score = weightMatch[3].replace(/^[:\-–\s]+/, '').replace(/[.\s]+$/, '').trim();
       subScores.push({ dimension, weight, score });
       return;
     }
