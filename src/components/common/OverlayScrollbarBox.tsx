@@ -99,7 +99,7 @@ export const OverlayScrollbarBox: React.FC<OverlayScrollbarBoxProps> = ({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className={`w-full h-full max-h-full overflow-y-auto overflow-x-hidden no-scrollbar ${paddingClassName}`}
+        className={`w-full h-full max-h-full overflow-auto no-scrollbar ${paddingClassName}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'

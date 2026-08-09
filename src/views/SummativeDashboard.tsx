@@ -6,7 +6,7 @@ import { ScoreBarGroup } from '../components/deconstruct/ScoreBarGroup';
 import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
 import { FreeformCopilotChat } from '../components/chat/FreeformCopilotChat';
-import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade, formatDimensionTitle, condenseCriterionTitle, canonicalizeCriterionTitle, isItemMatchingRubric } from '../utils/geminiService';
+import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade, formatDimensionTitle, condenseCriterionTitle, canonicalizeCriterionTitle, isItemMatchingRubric, extractOfficialRubricsFromHandbook } from '../utils/geminiService';
 import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 const getContributionRange = (scoreStr: string, weightPct: number) => {
@@ -271,6 +271,7 @@ export const SummativeDashboard: React.FC = () => {
     setHighlightedTextRange({ start, end, exactPhrase, timestamp: Date.now() });
   };
 
+  const courseHandbookText = useAppStore((state) => state.courseHandbookText);
   const strengths = summativeFeedbackData?.keyStrengths || [];
   const critiques = summativeFeedbackData?.areasForImprovement || [];
 
@@ -280,7 +281,7 @@ export const SummativeDashboard: React.FC = () => {
 
     const hasSubScores = Boolean(summativeFeedbackData?.subScores && summativeFeedbackData.subScores.length > 0);
 
-    // Step 1: Core Criteria - EXCLUSIVELY populated from subScores (Grade Breakdown data source)
+    // Step 1: Core Criteria - Populate from subScores if present, or extract from courseHandbookText
     if (hasSubScores) {
       summativeFeedbackData!.subScores!.forEach(s => {
         if (s.dimension) {
@@ -294,6 +295,17 @@ export const SummativeDashboard: React.FC = () => {
           }
         }
       });
+    } else {
+      const handbookOfficialTitles = extractOfficialRubricsFromHandbook(courseHandbookText, 'summative');
+      handbookOfficialTitles.forEach(title => {
+        if (!coreList.some(c => c.criterion.toLowerCase() === title.toLowerCase())) {
+          coreList.push({
+            criterion: title,
+            rawCriterion: title,
+            isOfficialRubric: true
+          });
+        }
+      });
     }
 
     // Step 2: Process observation items from data source (keyStrengths & areasForImprovement)
@@ -301,7 +313,7 @@ export const SummativeDashboard: React.FC = () => {
     const officialCoreTitles = coreList.map(c => c.criterion);
 
     obsList.forEach(item => {
-      const rawCrit = (item as any).associatedCriterion;
+      const rawCrit = (item as any).associatedCriterion || (item as any).metaCapabilityTag || item.title;
       if (rawCrit) {
         const { canonical, isOfficial } = canonicalizeCriterionTitle(rawCrit, officialCoreTitles);
         const displayTitle = condenseCriterionTitle(canonical || rawCrit);
@@ -332,7 +344,11 @@ export const SummativeDashboard: React.FC = () => {
             });
           }
         } else {
-          if (isOfficial) {
+          // When NO subScores exist (No Grade Breakdown):
+          // Check if item is an official rubric or default to core criteria unless explicitly non-official
+          const itemIsOfficial = (item as any).isOfficialRubric !== false;
+
+          if (itemIsOfficial || isOfficial) {
             if (!coreList.some(c => c.criterion.toLowerCase() === displayTitle.toLowerCase())) {
               coreList.push({
                 criterion: displayTitle,
@@ -353,11 +369,36 @@ export const SummativeDashboard: React.FC = () => {
       }
     });
 
-    return [...coreList, ...additionalList];
+    // Filter coreList: if a Core Criterion pill has 0 corresponding observation items under it, DO NOT show that pill!
+    const activeCoreList = coreList.filter(c => {
+      const cNorm = c.criterion.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+      const rawNorm = (c.rawCriterion || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+
+      return obsList.some(item => {
+        const rawCrit = (item as any).associatedCriterion;
+        if (!rawCrit) return false;
+        const { canonical } = canonicalizeCriterionTitle(rawCrit, officialCoreTitles);
+        const displayTitle = condenseCriterionTitle(canonical || rawCrit);
+
+        const candNorm = displayTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+        const itemCritNorm = rawCrit.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+
+        return (
+          cNorm === candNorm ||
+          rawNorm === itemCritNorm ||
+          cNorm.includes(candNorm) ||
+          candNorm.includes(cNorm) ||
+          rawNorm.includes(itemCritNorm) ||
+          itemCritNorm.includes(rawNorm)
+        );
+      });
+    });
+
+    return [...activeCoreList, ...additionalList];
   })();
 
 
-  const getScoreBadgeInfo = (scoreStr: string, weightStr?: string | null): { badgeClass: string; displayScore: string } => {
+  const getScoreBadgeInfo = (scoreStr: string, weightStr?: string | null, dimensionStr?: string | null): { badgeClass: string; displayScore: string } => {
     if (!scoreStr) return { badgeClass: 'bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs', displayScore: scoreStr || '' };
 
     const clean = scoreStr.toLowerCase().trim();
@@ -367,12 +408,18 @@ export const SummativeDashboard: React.FC = () => {
     const passPill = 'bg-[#FEF7E0] text-[#B06000] border border-[#FDE293] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const focusPill = 'bg-[#FCE8E6] text-[#C5221F] border border-[#FAD2CF] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
 
-    // Parse weight number if present (e.g., "(20%)" -> 20)
+    // Parse weight number if present from weightStr OR dimensionStr (e.g., "(20%)" -> 20)
     let weightNum: number | null = null;
     if (weightStr) {
       const wMatch = /(\d+(?:\.\d+)?)/.exec(weightStr);
       if (wMatch) {
         weightNum = parseFloat(wMatch[1]);
+      }
+    }
+    if (!weightNum && dimensionStr) {
+      const dimWMatch = /\(\s*(\d+(?:\.\d+)?%?)\s*\)/.exec(dimensionStr);
+      if (dimWMatch) {
+        weightNum = parseFloat(dimWMatch[1]);
       }
     }
 
@@ -413,7 +460,7 @@ export const SummativeDashboard: React.FC = () => {
       const pct = maxVal > 0 ? (val / maxVal) * 100 : val;
       const badgeClass = pct >= 70 ? distinctionPill : pct >= 60 ? meritPill : pct >= 50 ? passPill : focusPill;
       const displayPct = Math.round(pct * 10) / 10;
-      return { badgeClass, displayScore: `${displayPct}% (${val}/${maxVal})` };
+      return { badgeClass, displayScore: `${displayPct} - (${val}/${maxVal})` };
     }
 
     // 4. Standalone Number e.g. "15.5", "6.5", "77.5%", "85"
@@ -435,7 +482,7 @@ export const SummativeDashboard: React.FC = () => {
 
       const badgeClass = pct >= 70 ? distinctionPill : pct >= 60 ? meritPill : pct >= 50 ? passPill : focusPill;
       const displayPct = Math.round(pct * 10) / 10;
-      const displayScore = isRestoredFromWeight ? `${displayPct}% (${val}/${weightNum})` : `${displayPct}%`;
+      const displayScore = isRestoredFromWeight ? `${displayPct} - (${val}/${weightNum})` : (hasPercent ? `${displayPct}%` : `${displayPct}`);
 
       return { badgeClass, displayScore };
     }
@@ -707,7 +754,7 @@ export const SummativeDashboard: React.FC = () => {
                             {summativeFeedbackData.subScores && summativeFeedbackData.subScores.length > 0 ? (
                               <div className="flex flex-col gap-1 bg-slate-50/50 border border-slate-100 rounded-lg p-2 animate-in fade-in duration-300">
                                 {summativeFeedbackData.subScores.map((scoreItem, sIdx) => {
-                                  const badgeInfo = getScoreBadgeInfo(scoreItem.score, scoreItem.weight);
+                                  const badgeInfo = getScoreBadgeInfo(scoreItem.score, scoreItem.weight, scoreItem.dimension);
                                   return (
                                     <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
                                       <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
@@ -1546,7 +1593,7 @@ export const SummativeDashboard: React.FC = () => {
                         setShowSummativeInputValidationError(false);
                       }
                     }}
-                    placeholder="Paste the final grading comment or tutor's evaluation text here..."
+                    placeholder="Input or paste your project feedback comments and score breakdown details here..."
                     disabled={isLoading}
                     className="w-full flex-1 font-sf-pro font-normal text-xs text-slate-800 placeholder:text-slate-400 bg-slate-50/50 border border-slate-200 rounded-xl p-4 outline-none focus:border-brand-summative-primary focus:ring-1 focus:ring-brand-summative-primary/20 focus:bg-white transition-all tracking-normal leading-relaxed resize-none"
                   />

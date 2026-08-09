@@ -55,8 +55,19 @@ export function condenseCriterionTitle(dimension: string): string {
   if (!dimension) return '';
   let formatted = formatDimensionTitle(dimension).trim();
   
-  // Replace all occurrences of "and" with "&"
-  let cleanTitle = formatted.replace(/\band\b/gi, '&');
+  // 1. Strip ILO / CLO / LO numbers e.g. "(ILO1)", "[ILO2]", "ILO3", "(CLO1)"
+  let cleanTitle = formatted
+    .replace(/\s*[\(\[]?\b(?:ILO|CLO|LO|LOs|ILOs)\s*\d+[\)\]]?/gi, '')
+    .replace(/\s*\(\s*\)/g, '')
+    .trim();
+
+  // 2. Replace all occurrences of "and" with "&"
+  cleanTitle = cleanTitle.replace(/\band\b/gi, '&');
+
+  // 3. Remove verbose introductory action prefixes if phrase is wordy (e.g. "Evaluation of Market..." -> "Market, User & Contextual Needs")
+  cleanTitle = cleanTitle
+    .replace(/^(?:Evaluation of|Generation of|Application of|Assessment of)\s+/gi, '')
+    .trim();
 
   // Count words in the title
   const words = cleanTitle.split(/\s+/).filter(Boolean);
@@ -66,26 +77,8 @@ export function condenseCriterionTitle(dimension: string): string {
     return cleanTitle;
   }
 
-  // ONLY if greater than 5 words, apply rule-based / keyword condensation:
-  const lower = formatted.toLowerCase();
-  if (lower.includes('problem definition') || lower.includes('problem framing') || lower.includes('problem statement')) {
-    return 'Problem Definition & Research';
-  }
-  if (lower.includes('iterative design') || lower.includes('design process') || lower.includes('design evolution')) {
-    return 'Iterative Design Process & Evolution';
-  }
-  if (lower.includes('final high-fidelity') || lower.includes('high-fidelity demo') || lower.includes('advanced tech')) {
-    return 'Final High-Fidelity Demo & Advanced Tech';
-  }
-  if (lower.includes('communication') || lower.includes('presentation') || lower.includes('reflection')) {
-    return 'Communication & Presentation';
-  }
-  if (lower.includes('user research') || lower.includes('user study')) {
-    return 'User Research & Goals';
-  }
-
-  // Fallback for > 5 words: take first 4 words and append & if needed
-  return words.slice(0, 4).join(' ').replace(/\band\b/gi, '&');
+  // Fallback for > 5 words: take first 5 words
+  return words.slice(0, 5).join(' ').replace(/\band\b/gi, '&');
 }
 
 export function canonicalizeCriterionTitle(
@@ -127,6 +120,59 @@ export function canonicalizeCriterionTitle(
 
   // Tier 3: Additional Topic (Not matched to any Core Criteria)
   return { canonical: condensedRaw, isOfficial: false };
+}
+
+export function extractOfficialRubricsFromHandbook(
+  handbookText?: string,
+  mode: 'summative' | 'formative' = 'summative'
+): string[] {
+  if (!handbookText || handbookText.trim().length < 20) return [];
+
+  const lines = handbookText.split(/\r?\n/);
+  let isTargetSection = false;
+  let foundTargetSectionHeader = false;
+  const extractedCriteria: string[] = [];
+
+  const targetKeywords = mode === 'summative'
+    ? ['summative', 'final assessment', 'final portfolio', 'final evaluation', 'end of module', 'final submission', 'marking criteria for final']
+    : ['formative', 'interim assessment', 'mid-term', 'draft evaluation', 'phase 1', 'progress review', 'marking criteria for interim'];
+
+  const oppositeKeywords = mode === 'summative'
+    ? ['formative', 'interim assessment', 'mid-term']
+    : ['summative', 'final assessment', 'final portfolio'];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const lower = line.toLowerCase();
+    const isHeading = lower.includes('assessment') || lower.includes('criteria') || lower.includes('rubric') || lower.includes('marking') || /^\d+[\.\s]/.test(line);
+
+    if (isHeading) {
+      if (targetKeywords.some(kw => lower.includes(kw))) {
+        isTargetSection = true;
+        foundTargetSectionHeader = true;
+      } else if (oppositeKeywords.some(kw => lower.includes(kw))) {
+        isTargetSection = false;
+      }
+    }
+
+    if (isTargetSection || !foundTargetSectionHeader) {
+      if (
+        (lower.includes('ilo') || lower.includes('clo') || lower.includes('learning outcome') || /^[A-Z][a-zA-Z0-9\s,&:\/\-\(\)]+$/.test(line)) &&
+        !lower.includes('pass') && !lower.includes('excellent') && !lower.includes('satisfactory') && !lower.includes('description') &&
+        !lower.includes('marking criteria') && !lower.includes('criteria') && !lower.includes('assessment') &&
+        line.length > 5 && line.length < 90
+      ) {
+        const cleaned = condenseCriterionTitle(line);
+        if (cleaned && cleaned.length >= 3 && !extractedCriteria.includes(cleaned)) {
+          extractedCriteria.push(cleaned);
+        }
+      }
+    }
+  }
+
+  return extractedCriteria;
 }
 
 export function normalizeCriterionString(str: string): string {
@@ -1171,7 +1217,7 @@ You are now provided with additional context documents (Course Handbook Criteria
 INTEGRITY & WEIGHTING GUARDRAILS:
 1. ORIGINAL FEEDBACK PRIMACY: The instructor's feedback text is the absolute primary source. You must extract ALL critiques from the feedback text. The handbook and assignment draft are secondary reference materials to help ground and cross-examine the critiques.
 2. NO COMBINING OR OMITTING: Do NOT skip, omit, or combine any feedback critiques just because they do not have corresponding references in the handbook or draft. Every critique in the feedback text must be extracted as a separate key point, even if it has no multi-source references.
-3. PRESERVE SEQUENCING: The compiled key points must remain sorted strictly in the sequential order of their appearance in the original raw instructor feedback.
+4. TWO-STEP REGIONAL TARGETING & FORMATIVE PHASE ISOLATION: When extracting official criteria from [COURSE HANDBOOK CRITERIA], you MUST first locate and match the section heading/table specifically designated for 'Formative', 'Interim Assessment', 'Mid-Term Review', 'Draft Evaluation', or 'Phase 1 Assessment'. You are STRICTLY FORBIDDEN from using criteria from 'Summative' or 'Final Portfolio' tables when parsing a Formative evaluation! Strip any "(ILO1)", "(ILO2)" or ILO numbers, convert "and" to "&", and condense into clean 2-5 word core titles.
 
 ${handbookText ? `[COURSE HANDBOOK CRITERIA]:\n${handbookText}\n` : ''}
 ${assignmentText ? `[STUDENT ASSIGNMENT DRAFT]:\n${assignmentText}\n` : ''}
@@ -1657,8 +1703,12 @@ COMPILATION & REASONING RULES:
 
 3. HANDBOOK RUBRICS & ABSTRACT TAXONOMY TAGS EXTRACTION FLOW:
    Identify the core evaluation criteria from the course handbook, rubrics, or subScores breakdown.
-   - WORD COUNT RULE (CRITICAL): If a criterion title has 5 words or fewer (<= 5 words), use the VERBATIM original title, replacing any "and" with "&" (e.g. "Problem Definition & Research", "User Research & Goals", "Scenarios & Tasks", "Communication Skills"). DO NOT forcibly summarize titles that are 5 words or fewer!
-   - Only if a criterion title has MORE THAN 5 words (> 5 words), summarize or condense it into a shorter 2-5 word tag (replacing "and" with "&").
+   - SOURCING HIERARCHY & TWO-STEP REGIONAL TARGETING (CRITICAL):
+     * TIER 1 (GRADE BREAKDOWN PRIORITY): If explicit subScores/grade breakdown exist in the feedback text, extract their exact dimension titles as Core Criteria.
+     * TIER 2 (COURSE HANDBOOK REGIONAL MATCHING - NO LAZY FIRST TABLE): If NO subScores exist in the feedback text, scan the COURSE HANDBOOK CONTEXT for the official Rubric table corresponding to THIS specific evaluation phase:
+       - MANDATE AGAINST LAZY FIRST-TABLE PICKING: DO NOT subconsciously or lazily read the first table encountered in the document! PDF handbooks often place the Interim/Formative table on early pages. You MUST scan section/chapter headings first to locate the specific section for 'Summative Assessment', 'Final Evaluation', 'Final Portfolio', or 'End-of-Term Assessment'. Only extract criteria from the rubric table situated INSIDE that Final/Summative section! You are STRICTLY FORBIDDEN from extracting criteria from 'Formative', 'Interim', 'Draft', or 'Mid-term' rubric tables when parsing a Summative evaluation!
+       - CRITERIA EXTRACTION (VERBATIM CORE WORDS ONLY): Once the Summative/Final rubric table is located, extract the criterion titles from its 'Criteria' column. You MUST use the VERBATIM original wording or exact words extracted directly from the original phrase. ABSOLUTE PROHIBITION: You are STRICTLY FORBIDDEN from performing synonym replacements, semantic paraphrasing, or inventing external summary terms (e.g. do NOT substitute 'Problem Definition' with 'Problem Framing' if the text says 'Problem Definition'). Strip any "(ILO1)", "(ILO2)" or ILO numbers, convert "and" to "&", and preserve the original wording. Do NOT include page numbers or source metadata.
+   - VERBATIM ORIGINAL WORDS RULE: Strip any "(ILO1)", "(ILO2)" or LO numbers. Convert "and" to "&". Use verbatim words from the original criteria phrase. Do NOT replace with synonyms.
    Categorize every strength and area for improvement observation extracted from the feedback text:
    - OFFICIAL RUBRIC TRACK (isOfficialRubric = true): If the remark aligns with handbook criteria or subScores dimensions, set "associatedCriterion" to that exact taxonomy tag and set "isOfficialRubric" to true.
    - AI SELF-GENERALIZED TRACK (isOfficialRubric = false): If the remark discusses additional qualitative aspects, qualitatively summarize a short taxonomy tag (e.g. "Writing Style", "Presentation Format") and set "isOfficialRubric" to false.
@@ -2243,7 +2293,7 @@ export const processSummativeFeedback = async (
     }
 
     if (handbookText) {
-      prompt += `\n\nCOURSE HANDBOOK CONTEXT:\n${handbookText}`;
+      prompt += `\n\n[SUMMATIVE REGIONAL MATCHING DIRECTIVE]: You are parsing a SUMMATIVE / FINAL assessment. When inspecting COURSE HANDBOOK CONTEXT below, DO NOT lazily read the first table you encounter (which is often the Interim / Formative table on earlier pages). You MUST first scan the document headings to locate the specific section/chapter for 'Summative Assessment', 'Final Evaluation', 'Final Portfolio', or 'End of Term Assessment'. Only extract criteria from the rubric table situated INSIDE that Final/Summative section!\n\nCOURSE HANDBOOK CONTEXT:\n${handbookText}`;
     }
     if (assignmentText) {
       prompt += `\n\nSTUDENT ASSIGNMENT DRAFT CONTEXT:\n${assignmentText}`;

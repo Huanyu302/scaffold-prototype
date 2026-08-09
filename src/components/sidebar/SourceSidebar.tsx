@@ -485,6 +485,7 @@ export const SourceSidebar: React.FC = () => {
         briefingOverview: undefined
       },
       summativeFeedbackData: null,
+      rawFeedbackInput: '',
       isLaunched: false,
       isReadOnly: false,
       sidebarMode: 'project-setup',

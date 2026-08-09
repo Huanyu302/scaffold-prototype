@@ -247,6 +247,45 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     setRenderedZoom(1.0);
   };
 
+  // Omnidirectional Click & Drag Pan functionality for canvas
+  const isDraggingRef = useRef<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number }>({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+  const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 0 || e.button === 1) {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      isDraggingRef.current = true;
+      setIsMouseDown(true);
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop
+      };
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    e.preventDefault();
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+
+    container.scrollLeft = dragStartRef.current.scrollLeft - dx;
+    container.scrollTop = dragStartRef.current.scrollTop - dy;
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    setIsMouseDown(false);
+  };
+
   // Support Ctrl / Cmd + Wheel zoom
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -611,36 +650,43 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
       {/* Pages Container Box (Client-side rendered Canvas pages or Stylized fallbacks) */}
       {currentPdfDoc ? (
-        <OverlayScrollbarBox
-          key={activeFile?.id || 'pdf-container'}
-          containerRef={scrollContainerRef}
-          className="flex-1 bg-slate-100/80"
-          paddingClassName="px-2 pt-4 pb-6 flex flex-col items-center justify-start space-y-4"
+        <div
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`flex-1 min-h-0 flex flex-col ${isMouseDown ? 'cursor-grabbing select-none' : (zoomLevel > 1.0 ? 'cursor-grab' : '')}`}
         >
-          {Array.from({ length: currentNumPages }).map((_, i) => {
-            const pageNum = i + 1;
-            const visualScale = zoomLevel / renderedZoom;
+          <OverlayScrollbarBox
+            key={activeFile?.id || 'pdf-container'}
+            containerRef={scrollContainerRef}
+            className="flex-1 bg-slate-100/80 overflow-auto"
+            paddingClassName={`px-4 pt-4 pb-6 flex flex-col ${zoomLevel > 1.0 ? 'items-start' : 'items-center'} justify-start space-y-4`}
+          >
+            {Array.from({ length: currentNumPages }).map((_, i) => {
+              const pageNum = i + 1;
+              const containerWidthPct = Math.round(zoomLevel * 100);
 
-            return (
-              <div
-                key={`${activeFile.id}-p-${pageNum}`}
-                id={`doc-page-${pageNum}`}
-                className="relative bg-white shadow-sm rounded-lg p-0.5 border border-slate-200 transition-transform duration-75 max-w-full"
-                style={{
-                  width: '100%',
-                  transform: visualScale !== 1.0 ? `scale(${visualScale})` : undefined,
-                  transformOrigin: 'top center'
-                }}
-              >
-                {getHighlightOverlayForPage(pageNum)}
-                <PdfPageRenderer cacheKey={cacheKey} pdfDoc={currentPdfDoc} pageNum={pageNum} renderedZoom={renderedZoom} />
-                <div className="absolute bottom-3 right-4 text-[9px] bg-slate-900/60 text-white px-2 py-0.5 rounded font-mono select-none pointer-events-none z-10">
-                  Page {pageNum}
+              return (
+                <div
+                  key={`${activeFile.id}-p-${pageNum}`}
+                  id={`doc-page-${pageNum}`}
+                  className="relative bg-white shadow-sm rounded-lg p-0.5 border border-slate-200 transition-all duration-200 ease-out flex-shrink-0"
+                  style={{
+                    width: `${containerWidthPct}%`,
+                    maxWidth: zoomLevel <= 1.0 ? '100%' : 'none'
+                  }}
+                >
+                  {getHighlightOverlayForPage(pageNum)}
+                  <PdfPageRenderer cacheKey={cacheKey} pdfDoc={currentPdfDoc} pageNum={pageNum} renderedZoom={renderedZoom} />
+                  <div className="absolute bottom-3 right-4 text-[9px] bg-slate-900/60 text-white px-2 py-0.5 rounded font-mono select-none pointer-events-none z-10">
+                    Page {pageNum}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </OverlayScrollbarBox>
+              );
+            })}
+          </OverlayScrollbarBox>
+        </div>
       ) : (
         <div
           key={activeFile?.id || 'non-pdf-container'}
