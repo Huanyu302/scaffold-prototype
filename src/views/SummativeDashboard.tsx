@@ -357,87 +357,100 @@ export const SummativeDashboard: React.FC = () => {
   })();
 
 
-  const getScoreBadgeClass = (scoreStr: string): string => {
-    const clean = scoreStr.toLowerCase();
+  const getScoreBadgeInfo = (scoreStr: string, weightStr?: string | null): { badgeClass: string; displayScore: string } => {
+    if (!scoreStr) return { badgeClass: 'bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs', displayScore: scoreStr || '' };
+
+    const clean = scoreStr.toLowerCase().trim();
 
     const distinctionPill = 'bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const meritPill = 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const passPill = 'bg-[#FEF7E0] text-[#B06000] border border-[#FDE293] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
     const focusPill = 'bg-[#FCE8E6] text-[#C5221F] border border-[#FAD2CF] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
 
-    // 1. Check numeric range first if present (e.g., "(60-70)" or "88/100")
-    const rangeMatch = /(\d+)\s*-\s*(\d+)/.exec(clean);
-    if (rangeMatch) {
-      const avg = (parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2;
-      if (avg >= 70) return distinctionPill;
-      if (avg >= 60) return meritPill;
-      if (avg >= 50) return passPill;
-      return focusPill;
+    // Parse weight number if present (e.g., "(20%)" -> 20)
+    let weightNum: number | null = null;
+    if (weightStr) {
+      const wMatch = /(\d+(?:\.\d+)?)/.exec(weightStr);
+      if (wMatch) {
+        weightNum = parseFloat(wMatch[1]);
+      }
     }
 
-    // 2. Try to parse slash: "85/100"
-    const slashMatch = /(\d+)\s*\/\s*(\d+)/.exec(clean);
-    if (slashMatch) {
-      const pct = (parseInt(slashMatch[1]) / parseInt(slashMatch[2])) * 100;
-      if (pct >= 70) return distinctionPill;
-      if (pct >= 60) return meritPill;
-      if (pct >= 50) return passPill;
-      return focusPill;
-    }
-
-    // 3. Standalone number check: e.g. "72", "68", "58", "52", "45"
-    const numMatch = /(\d+)/.exec(clean);
-    if (numMatch) {
-      const val = parseInt(numMatch[1]);
-      if (val >= 70) return distinctionPill;
-      if (val >= 60) return meritPill;
-      if (val >= 50) return passPill;
-      return focusPill;
-    }
-
-    // 4. Comparison operators like "<50"
-    if (clean.includes('<50') || clean.includes('< 50') || clean.includes('under 50') || clean.includes('below 50')) {
-      return focusPill;
-    }
-    if (clean.includes('>70') || clean.includes('> 70') || clean.includes('above 70') || clean.includes('>80') || clean.includes('> 80')) {
-      return distinctionPill;
-    }
-
-    // 5. Level 4: Excellent, Outstanding, Distinction, Exceptional, Superb, Perfect, Brilliant
+    // 1. Text / qualitative grade keywords
     const excellentKeywords = ['excellent', 'outstanding', 'distinction', 'exceptional', 'superb', 'perfect', 'brilliant', 'high pass', 'stellar', 'expert', 'mastery', 'first'];
     if (excellentKeywords.some(keyword => clean.includes(keyword))) {
-      return distinctionPill;
+      return { badgeClass: distinctionPill, displayScore: scoreStr };
     }
 
-    // 6. Level 3: Very Good, Good, Merit, Proficient, Solid, Strong, Commendable, Competent
     const goodKeywords = ['very good', 'good', 'merit', 'proficient', 'solid', 'strong', 'commendable', 'competent', 'sound', 'very positive', 'high merit', '2:1', 'upper second'];
     if (goodKeywords.some(keyword => clean.includes(keyword))) {
-      return meritPill;
+      return { badgeClass: meritPill, displayScore: scoreStr };
     }
 
-    // 7. Level 2: Satisfactory, Pass, Average, Acceptable, Adequate, Fair, Sufficient, Moderate
     const passKeywords = ['satisfactory', 'pass', 'average', 'acceptable', 'adequate', 'fair', 'sufficient', 'moderate', '2:2', 'lower second', 'third'];
     if (passKeywords.some(keyword => clean.includes(keyword))) {
-      return passPill;
+      return { badgeClass: passPill, displayScore: scoreStr };
     }
 
-    // 8. Level 1: Fail, Poor, Inadequate, Weak, Unacceptable, Unsatisfactory
     const failKeywords = ['fail', 'poor', 'inadequate', 'weak', 'unacceptable', 'unsatisfactory', 'failed', 'focus', 'resit'];
     if (failKeywords.some(keyword => clean.includes(keyword))) {
-      return focusPill;
+      return { badgeClass: focusPill, displayScore: scoreStr };
     }
 
-    // 9. Letter grades B, A, C, D
+    // 2. Numerical Range e.g. "(60-70)"
+    const rangeMatch = /(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/.exec(clean);
+    if (rangeMatch && !clean.startsWith('-')) {
+      const avg = (parseFloat(rangeMatch[1]) + parseFloat(rangeMatch[2])) / 2;
+      const badgeClass = avg >= 70 ? distinctionPill : avg >= 60 ? meritPill : avg >= 50 ? passPill : focusPill;
+      return { badgeClass, displayScore: scoreStr };
+    }
+
+    // 3. Slash format e.g. "85/100" or "15.5/20"
+    const slashMatch = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/.exec(clean);
+    if (slashMatch) {
+      const val = parseFloat(slashMatch[1]);
+      const maxVal = parseFloat(slashMatch[2]);
+      const pct = maxVal > 0 ? (val / maxVal) * 100 : val;
+      const badgeClass = pct >= 70 ? distinctionPill : pct >= 60 ? meritPill : pct >= 50 ? passPill : focusPill;
+      const displayPct = Math.round(pct * 10) / 10;
+      return { badgeClass, displayScore: `${displayPct}% (${val}/${maxVal})` };
+    }
+
+    // 4. Standalone Number e.g. "15.5", "6.5", "77.5%", "85"
+    const numMatch = /(\d+(?:\.\d+)?)/.exec(clean);
+    if (numMatch) {
+      const val = parseFloat(numMatch[1]);
+      const hasPercent = clean.includes('%');
+
+      let pct: number;
+      let isRestoredFromWeight = false;
+
+      if (!hasPercent && weightNum && weightNum > 0 && val <= weightNum) {
+        // Weighted Point Score! Restore to 100-point percentage: P = (val / weightNum) * 100
+        pct = (val / weightNum) * 100;
+        isRestoredFromWeight = true;
+      } else {
+        pct = val;
+      }
+
+      const badgeClass = pct >= 70 ? distinctionPill : pct >= 60 ? meritPill : pct >= 50 ? passPill : focusPill;
+      const displayPct = Math.round(pct * 10) / 10;
+      const displayScore = isRestoredFromWeight ? `${displayPct}% (${val}/${weightNum})` : `${displayPct}%`;
+
+      return { badgeClass, displayScore };
+    }
+
+    // 5. Letter grades B, A, C, D
     const gradeLetterMatch = /\b([a-f])\s*([+\-])?\b/i.exec(clean);
     if (gradeLetterMatch) {
       const letter = gradeLetterMatch[1].toUpperCase();
-      if (letter === 'A') return distinctionPill;
-      if (letter === 'B') return meritPill;
-      if (letter === 'C' || letter === 'D') return passPill;
-      return focusPill;
+      if (letter === 'A') return { badgeClass: distinctionPill, displayScore: scoreStr };
+      if (letter === 'B') return { badgeClass: meritPill, displayScore: scoreStr };
+      if (letter === 'C' || letter === 'D') return { badgeClass: passPill, displayScore: scoreStr };
+      return { badgeClass: focusPill, displayScore: scoreStr };
     }
 
-    return 'bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs';
+    return { badgeClass: 'bg-slate-100 text-slate-700 border border-[#D2E3FC] px-2 py-0.5 rounded-full text-[9px] font-heading font-extrabold shadow-2xs', displayScore: scoreStr };
   };
 
   const getOverallGradeStyle = (gradeStr: string): { container: string; pulse: string } => {
@@ -693,23 +706,26 @@ export const SummativeDashboard: React.FC = () => {
 
                             {summativeFeedbackData.subScores && summativeFeedbackData.subScores.length > 0 ? (
                               <div className="flex flex-col gap-1 bg-slate-50/50 border border-slate-100 rounded-lg p-2 animate-in fade-in duration-300">
-                                {summativeFeedbackData.subScores.map((scoreItem, sIdx) => (
-                                  <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
-                                    <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
-                                      <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
-                                        {formatDimensionTitle(scoreItem.dimension)}
-                                      </span>
-                                      {scoreItem.weight && (
-                                        <span className="font-semibold text-slate-700 flex-shrink-0 self-center">
-                                          {scoreItem.weight.startsWith('(') ? scoreItem.weight : `(${scoreItem.weight})`}
+                                {summativeFeedbackData.subScores.map((scoreItem, sIdx) => {
+                                  const badgeInfo = getScoreBadgeInfo(scoreItem.score, scoreItem.weight);
+                                  return (
+                                    <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                                        <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
+                                          {formatDimensionTitle(scoreItem.dimension)}
                                         </span>
-                                      )}
+                                        {scoreItem.weight && (
+                                          <span className="font-semibold text-slate-700 flex-shrink-0 self-center">
+                                            {scoreItem.weight.startsWith('(') ? scoreItem.weight : `(${scoreItem.weight})`}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={`font-heading flex-shrink-0 whitespace-nowrap self-center ${badgeInfo.badgeClass}`}>
+                                        {badgeInfo.displayScore}
+                                      </span>
                                     </div>
-                                    <span className={`font-heading flex-shrink-0 whitespace-nowrap self-center ${getScoreBadgeClass(scoreItem.score)}`}>
-                                      {scoreItem.score}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             ) : null}
                           </div>
