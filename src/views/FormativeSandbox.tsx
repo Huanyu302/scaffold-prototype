@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Sparkles, Check, Play, AlertCircle, GitBranch, A
 import { useAppStore, SandboxTodoItem, ChatMessage } from '../store/useAppStore';
 import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
-import { calculateWeightedGrade, formatDimensionTitle } from '../utils/geminiService';
+import { calculateWeightedGrade, formatDimensionTitle, canonicalizeCriterionTitle, condenseCriterionTitle, isItemMatchingRubric } from '../utils/geminiService';
 import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 export const FormativeSandbox: React.FC = () => {
@@ -223,34 +223,115 @@ export const FormativeSandbox: React.FC = () => {
   const yellowCount = formativeFeedbackData.coreKeyPoints.filter(kp => kp.severity === 'moderate').length;
   const greenCount = formativeFeedbackData.coreKeyPoints.filter(kp => kp.severity !== 'critical' && kp.severity !== 'moderate').length;
 
+  // Dynamically compile the deduplicated rubric statuses with canonical matching and strict subScores locking
+  const renderedRubrics = (() => {
+    const coreList: Array<{ criterion: string; rawCriterion?: string; status?: string; isOfficialRubric: boolean }> = [];
+    const additionalList: Array<{ criterion: string; rawCriterion?: string; status?: string; isOfficialRubric: boolean }> = [];
+
+    const subScores = formativeFeedbackData.briefingOverview?.subScores || [];
+    const rubricStatuses = formativeFeedbackData.briefingOverview?.rubricStatuses || [];
+
+    const hasSubScores = subScores.length > 0;
+    const officialCoreNames: string[] = [];
+
+    // Step 1: Core Criteria - EXCLUSIVELY populated from subScores when present, or official rubricStatuses
+    if (hasSubScores) {
+      subScores.forEach(s => {
+        if (s.dimension) {
+          const condensed = condenseCriterionTitle(s.dimension);
+          officialCoreNames.push(condensed);
+          if (!coreList.some(c => c.criterion.toLowerCase() === condensed.toLowerCase())) {
+            coreList.push({
+              criterion: condensed,
+              rawCriterion: s.dimension,
+              status: 'green',
+              isOfficialRubric: true
+            });
+          }
+        }
+      });
+    } else if (rubricStatuses.length > 0) {
+      rubricStatuses.filter(r => r.isOfficialRubric).forEach(r => {
+        officialCoreNames.push(r.criterion);
+        if (!coreList.some(c => c.criterion.toLowerCase() === r.criterion.toLowerCase())) {
+          coreList.push({ ...r, rawCriterion: r.criterion, isOfficialRubric: true });
+        }
+      });
+    }
+
+    // Step 2: Process keypoints for Additional Topics (or fallback Core Criteria)
+    const keypoints = formativeFeedbackData.coreKeyPoints || [];
+    const hasCoreBase = officialCoreNames.length > 0;
+
+    keypoints.forEach(kp => {
+      if (kp.associatedCriterion) {
+        const { canonical, isOfficial } = canonicalizeCriterionTitle(kp.associatedCriterion, officialCoreNames);
+        const displayTitle = condenseCriterionTitle(canonical || kp.associatedCriterion);
+        
+        if (hasCoreBase) {
+          // When Core Criteria is locked by subScores/rubricStatuses, any non-core topic goes to Additional Topics
+          const isCoveredInCore = coreList.some(c => {
+            const cNorm = c.criterion.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const rawNorm = (c.rawCriterion || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const candNorm = displayTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const itemCritNorm = kp.associatedCriterion.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+
+            return (
+              cNorm === candNorm ||
+              rawNorm === itemCritNorm ||
+              cNorm.includes(candNorm) ||
+              candNorm.includes(cNorm) ||
+              rawNorm.includes(itemCritNorm) ||
+              itemCritNorm.includes(rawNorm)
+            );
+          });
+
+          if (!isCoveredInCore && !additionalList.some(a => a.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+            additionalList.push({
+              criterion: displayTitle,
+              rawCriterion: kp.associatedCriterion,
+              status: kp.severity === 'critical' ? 'red' : kp.severity === 'moderate' ? 'yellow' : 'green',
+              isOfficialRubric: false
+            });
+          }
+        } else {
+          if (isOfficial) {
+            if (!coreList.some(c => c.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+              coreList.push({
+                criterion: displayTitle,
+                rawCriterion: kp.associatedCriterion,
+                status: kp.severity === 'critical' ? 'red' : kp.severity === 'moderate' ? 'yellow' : 'green',
+                isOfficialRubric: true
+              });
+            }
+          } else {
+            if (!additionalList.some(a => a.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+              additionalList.push({
+                criterion: displayTitle,
+                rawCriterion: kp.associatedCriterion,
+                status: kp.severity === 'critical' ? 'red' : kp.severity === 'moderate' ? 'yellow' : 'green',
+                isOfficialRubric: false
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return [...coreList, ...additionalList];
+  })();
+
   const filteredKeyPoints = formativeFeedbackData.coreKeyPoints.filter(kp => {
     const matchesSeverity = !severityFilter || 
       (severityFilter === 'critical' && kp.severity === 'critical') ||
       (severityFilter === 'moderate' && kp.severity === 'moderate') ||
       (severityFilter === 'minor' && kp.severity !== 'critical' && kp.severity !== 'moderate');
-    const matchesRubric = !rubricFilter || (kp.associatedCriterion && kp.associatedCriterion.toLowerCase() === rubricFilter.toLowerCase());
-    return matchesSeverity && matchesRubric;
-  });
-
-  // Dynamically compile the deduplicated rubric statuses with frontend fallback assertion (no status colors dynamically needed for tags)
-  const renderedRubrics = (() => {
-    const list = [...(formativeFeedbackData.briefingOverview?.rubricStatuses || [])];
-    const keypointCriteria = Array.from(new Set(formativeFeedbackData.coreKeyPoints.map(kp => kp.associatedCriterion).filter(Boolean)));
     
-    // Ensure all criteria from keypoints are present in the list
-    keypointCriteria.forEach(crit => {
-      const exists = list.some(r => r.criterion.toLowerCase() === crit.toLowerCase());
-      if (!exists) {
-        const kpSample = formativeFeedbackData.coreKeyPoints.find(kp => kp.associatedCriterion === crit);
-        list.push({
-          criterion: crit,
-          status: 'yellow',
-          isOfficialRubric: kpSample ? kpSample.isOfficialRubric : false
-        });
-      }
-    });
-    return list;
-  })();
+    if (!matchesSeverity) return false;
+    if (!rubricFilter) return true;
+
+    return isItemMatchingRubric(kp, rubricFilter, renderedRubrics);
+  });
   
   // Local Chat Input State
   const [chatInput, setChatInput] = useState('');
@@ -771,127 +852,8 @@ export const FormativeSandbox: React.FC = () => {
                         <div className="h-6 bg-slate-100 rounded w-full border-t border-slate-50 pt-2" />
                       </div>
                     ) : (formativeFeedbackData.briefingOverview ? (
-                      !isOverviewExpanded ? (
-                        /* Collapsed Dashboard Bar */
-                        <div className="bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-xl p-2.5 shadow-2xs min-h-11 box-border flex items-center justify-between gap-2.5 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none overflow-hidden w-full max-w-full">
-                          {/* Left: Grade badge */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Grade</span>
-                            {(() => {
-                              const overview = formativeFeedbackData.briefingOverview;
-                              const rawGrade = overview?.overallGrade;
-                              const isExplicitGrade = Boolean(rawGrade && rawGrade !== "?" && !overview?.isAutoCalculated);
-                              const computedGrade = calculateWeightedGrade(overview?.subScores);
-                              const effectiveGrade = rawGrade && rawGrade !== "?" ? rawGrade : (computedGrade || "?");
-                              const isAICalculated = Boolean(overview?.isAutoCalculated || (!isExplicitGrade && computedGrade));
-
-                              if (effectiveGrade !== "?") {
-                                const style = getOverallGradeStyle(effectiveGrade);
-                                return (
-                                  <div className="flex items-center gap-1.5">
-                                    <div className={`inline-flex items-center justify-center font-heading font-extrabold text-[10px] px-2.5 py-0.5 rounded-full select-none whitespace-nowrap ${style.container}`}>
-                                      {effectiveGrade}
-                                    </div>
-                                    {isAICalculated && (
-                                      <span className="text-[9px] font-sf-pro font-medium text-slate-400 select-none whitespace-nowrap">
-                                        (Auto-calculated)
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return (
-                                <div className="w-5 h-5 rounded-full bg-transparent border border-slate-200 flex items-center justify-center text-[9px] font-heading font-extrabold text-slate-400 select-none">
-                                  ?
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* Middle: Tiny Severity stats (Interactive Filters) */}
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => {
-                                setRubricFilter(null);
-                                setSeverityFilter(severityFilter === 'critical' ? null : 'critical');
-                              }}
-                              className={`flex items-center gap-1.5 text-[10px] font-heading font-bold px-2 py-0.5 rounded-full cursor-pointer border ${
-                                severityFilter === 'critical'
-                                  ? 'border-rose-400 bg-[#FAD2CF]/30 text-rose-900 shadow-2xs'
-                                  : severityFilter
-                                  ? 'border-rose-200/30 bg-[#FBF0EF]/40 text-rose-900/40 opacity-40'
-                                  : 'border-rose-200/50 bg-[#FBF0EF] text-rose-900/80'
-                              }`}
-                              title={severityFilter === 'critical' ? "Clear Warnings filter" : "Filter by Warnings"}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              <span>{redCount}</span>
-                            </button>
-                            
-                            <button
-                              onClick={() => {
-                                setRubricFilter(null);
-                                setSeverityFilter(severityFilter === 'moderate' ? null : 'moderate');
-                              }}
-                              className={`flex items-center gap-1.5 text-[10px] font-heading font-bold px-2 py-0.5 rounded-full cursor-pointer border ${
-                                severityFilter === 'moderate'
-                                  ? 'border-amber-400/80 bg-[#FEF7E0] text-amber-900 shadow-2xs'
-                                  : severityFilter
-                                  ? 'border-amber-200/30 bg-[#FEF7E0]/40 text-amber-700/40 opacity-40'
-                                  : 'border-amber-200/60 bg-[#FEF7E0] text-amber-700'
-                              }`}
-                              title={severityFilter === 'moderate' ? "Clear Issues filter" : "Filter by Issues"}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              <span>{yellowCount}</span>
-                            </button>
-                            
-                            <button
-                              onClick={() => {
-                                setRubricFilter(null);
-                                setSeverityFilter(severityFilter === 'minor' ? null : 'minor');
-                              }}
-                              className={`flex items-center gap-1.5 text-[10px] font-heading font-bold px-2 py-0.5 rounded-full cursor-pointer border ${
-                                severityFilter === 'minor'
-                                  ? 'border-emerald-400 bg-[#CEEAD6]/30 text-emerald-900 shadow-2xs'
-                                  : severityFilter
-                                  ? 'border-emerald-200/30 bg-[#EBF4F0]/40 text-emerald-700/40 opacity-40'
-                                  : 'border-emerald-200/60 bg-[#EBF4F0] text-emerald-700'
-                              }`}
-                              title={severityFilter === 'minor' ? "Clear On Track filter" : "Filter by On Track"}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              <span>{greenCount}</span>
-                            </button>
-                          </div>
-
-                          {/* Right: Actions (Clear Filters + Toggle Expand) */}
-                          <div className="flex items-center gap-2">
-                            {(severityFilter || rubricFilter) && (
-                              <button
-                                onClick={() => {
-                                  setSeverityFilter(null);
-                                  setRubricFilter(null);
-                                }}
-                                className="group text-[11px] font-sf-pro font-normal text-slate-400 hover:text-slate-650 cursor-pointer whitespace-nowrap bg-transparent p-0 border-0 shadow-none outline-none flex items-center gap-1"
-                              >
-                                <X className="w-3 h-3 text-slate-400 group-hover:text-slate-650" />
-                                <span>Clear filters</span>
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setIsOverviewExpanded(true)}
-                              className="p-1 text-slate-455 hover:text-slate-700 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer flex items-center justify-center"
-                              title="Expand Overview"
-                            >
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Expanded Overview State: Full Dashboard Card */
                         <div
-                          className="bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-xl p-4 shadow-2xs min-h-[220px] box-border flex flex-col justify-between gap-3.5 flex-shrink-0 select-none overflow-hidden w-full max-w-full"
+                          className="bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-xl p-4 shadow-2xs h-auto box-border flex flex-col justify-between gap-3.5 flex-shrink-0 select-none overflow-hidden w-full max-w-full"
                         >
                           {/* Row 1: Grade and Actions */}
                           <div className="flex justify-between items-center w-full">
@@ -944,14 +906,18 @@ export const FormativeSandbox: React.FC = () => {
                               )}
                               
                               <button
-                                onClick={() => setIsOverviewExpanded(false)}
-                                className="p-1 text-slate-455 hover:text-slate-700 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer flex items-center justify-center"
-                                title="Collapse Overview"
+                                onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
+                                className="p-1 text-slate-455 hover:text-slate-700 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer flex items-center justify-center transition-all"
+                                title={isOverviewExpanded ? "Collapse Breakdown & Summary" : "Expand Breakdown & Summary"}
                               >
-                                <ChevronUp className="w-3.5 h-3.5" />
+                                {isOverviewExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                               </button>
                             </div>
                           </div>
+
+                          {/* Collapsible Section: Breakdown + Summary Text */}
+                          {isOverviewExpanded && (
+                            <>
 
                           {/* Sub-Scores Breakdown Module */}
                           <div className="border-t border-slate-100/60 pt-2 flex flex-col gap-1.5 select-text flex-shrink-0">
@@ -986,6 +952,15 @@ export const FormativeSandbox: React.FC = () => {
                               </div>
                             ) : null}
                           </div>
+
+                          {/* globalSummary text container (Below Breakdown, Above Pills) */}
+                          <div className="border-t border-slate-100/60 pt-3 select-text flex-shrink-0">
+                            <p className="text-[11.5px] text-slate-650 font-sf-pro leading-loose block break-words text-left">
+                              {formativeFeedbackData.briefingOverview.globalSummary || "Feedback parsed. Ready for detailed exploration below."}
+                            </p>
+                          </div>
+                          </>
+                        )}
 
                             {/* Row 2: Metrics Badges (Interactive Buttons) */}
                             <div className="flex flex-wrap items-center justify-start gap-2.5 w-full max-w-full border-t border-slate-100/60 pt-2 flex-shrink-0">
@@ -1059,7 +1034,7 @@ export const FormativeSandbox: React.FC = () => {
                                   <div className="relative group/info flex items-center">
                                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" />
                                     <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover/info:block w-64 p-2.5 bg-slate-900 text-white text-[10.5px] font-sf-pro leading-relaxed rounded-xl shadow-xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                                      Core Criteria are linked directly to official handbook guidelines. Other Observations are generalized by AI; students should evaluate AI-generated insights critically and cautiously.
+                                      Core Criteria are linked directly to official handbook evaluation dimensions.
                                       <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-900" />
                                     </div>
                                   </div>
@@ -1094,7 +1069,16 @@ export const FormativeSandbox: React.FC = () => {
                             {/* Group 2: Additional Topics */}
                             {renderedRubrics && renderedRubrics.some(r => !r.isOfficialRubric) && (
                               <div className="flex flex-col gap-2">
-                                <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Additional Topics</span>
+                                <div className="flex items-center gap-1.5 select-none">
+                                  <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Additional Topics</span>
+                                  <div className="relative group/info flex items-center">
+                                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" />
+                                    <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover/info:block w-64 p-2.5 bg-slate-900 text-white text-[10.5px] font-sf-pro leading-relaxed rounded-xl shadow-xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                      Additional Topics are generalized by AI based on qualitative commentary; students should evaluate AI-generated insights critically and cautiously.
+                                      <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-900" />
+                                    </div>
+                                  </div>
+                                </div>
                                 <div className="flex flex-wrap gap-2">
                                   {renderedRubrics.filter(r => !r.isOfficialRubric).map((rub, rIdx) => {
                                     const isActive = rubricFilter?.toLowerCase() === rub.criterion.toLowerCase();
@@ -1128,16 +1112,8 @@ export const FormativeSandbox: React.FC = () => {
                               </span>
                             )}
                           </div>
-
-                          {/* Bottom Row: globalSummary text container (Flexible Height) */}
-                          <div className="border-t border-slate-100 pt-3 select-text flex-shrink-0">
-                            <p className="text-[11.5px] text-slate-650 font-sf-pro leading-loose block break-words">
-                              {formativeFeedbackData.briefingOverview.globalSummary || "Feedback parsed. Ready for detailed exploration below."}
-                            </p>
-                          </div>
                         </div>
-                      )
-                    ) : null)}
+                      ) : null)}
 
                     {/* Lower Section: Batch Action Bar & Key Points List */}
                     {isAIWorking ? (
@@ -1227,10 +1203,10 @@ export const FormativeSandbox: React.FC = () => {
                                 <div
                                   key={kp.id}
                                   ref={kpIdx === 0 ? firstKeyPointRef : undefined}
-                                  className={`p-3 border rounded-xl flex justify-between items-center gap-4 group ${
-                                  isChecked
+                                  className={`p-3 border rounded-xl flex justify-between items-center gap-4 group transition-all duration-200 ${
+                                    isChecked
                                       ? 'border-brand-formative-primary/60 bg-cyan-50/10'
-                                      : 'border-slate-150 bg-white'
+                                      : 'border-slate-150 bg-white hover:border-brand-formative-primary/40'
                                   }`}
                                   onClick={() => toggleSelectBriefing(kp.id)}
                                 >
@@ -1268,26 +1244,20 @@ export const FormativeSandbox: React.FC = () => {
                                     </span>
                                   </div>
                                 
-                                <div 
-                                  className="flex items-center space-x-3 flex-shrink-0"
+                                <div
+                                  className="flex items-center flex-shrink-0"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  {/* Read More Tooltip Wrapper */}
-                                  <div className="relative group/tooltip">
-                                    <button
-                                      onClick={() => handleReadMoreClick(kp.id)}
-                                      className={`p-1.5 border rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                                        isFlashingAnchor
-                                          ? 'border-cyan-500 bg-cyan-100 text-cyan-700 ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20'
-                                          : 'border-slate-200 hover:border-brand-formative-primary/60 hover:text-brand-formative-primary text-slate-500 hover:bg-cyan-50/40 hover:scale-105 active:scale-95'
-                                      }`}
-                                    >
-                                      <ArrowRight className={`w-3.5 h-3.5 ${isFlashingAnchor ? 'text-cyan-700 stroke-[2.5]' : ''}`} />
-                                    </button>
-                                    <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2.5 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
-                                      Read More & Locate Excerpt
-                                    </div>
-                                  </div>
+                                  <button
+                                    onClick={() => handleReadMoreClick(kp.id)}
+                                    className={`p-1.5 border rounded-lg transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                                      isFlashingAnchor
+                                        ? 'border-cyan-500 bg-cyan-100 text-cyan-700 ring-2 ring-cyan-400/80 scale-105 shadow-md animate-flash-once z-20'
+                                        : 'border-slate-200 hover:border-brand-formative-primary/60 hover:text-brand-formative-primary text-slate-500 hover:bg-cyan-50/40 hover:scale-105 active:scale-95'
+                                    }`}
+                                  >
+                                    <ArrowRight className={`w-3.5 h-3.5 ${isFlashingAnchor ? 'text-cyan-700 stroke-[2.5]' : ''}`} />
+                                  </button>
                                 </div>
                               </div>
                               );

@@ -51,6 +51,170 @@ export function formatDimensionTitle(dimension: string): string {
     .join(' ');
 }
 
+export function condenseCriterionTitle(dimension: string): string {
+  if (!dimension) return '';
+  let formatted = formatDimensionTitle(dimension).trim();
+  
+  // Replace all occurrences of "and" with "&"
+  let cleanTitle = formatted.replace(/\band\b/gi, '&');
+
+  // Count words in the title
+  const words = cleanTitle.split(/\s+/).filter(Boolean);
+
+  // RULE: If 5 words or fewer, DO NOT forcibly summarize! Return original title with &
+  if (words.length <= 5) {
+    return cleanTitle;
+  }
+
+  // ONLY if greater than 5 words, apply rule-based / keyword condensation:
+  const lower = formatted.toLowerCase();
+  if (lower.includes('problem definition') || lower.includes('problem framing') || lower.includes('problem statement')) {
+    return 'Problem Definition & Research';
+  }
+  if (lower.includes('iterative design') || lower.includes('design process') || lower.includes('design evolution')) {
+    return 'Iterative Design Process & Evolution';
+  }
+  if (lower.includes('final high-fidelity') || lower.includes('high-fidelity demo') || lower.includes('advanced tech')) {
+    return 'Final High-Fidelity Demo & Advanced Tech';
+  }
+  if (lower.includes('communication') || lower.includes('presentation') || lower.includes('reflection')) {
+    return 'Communication & Presentation';
+  }
+  if (lower.includes('user research') || lower.includes('user study')) {
+    return 'User Research & Goals';
+  }
+
+  // Fallback for > 5 words: take first 4 words and append & if needed
+  return words.slice(0, 4).join(' ').replace(/\band\b/gi, '&');
+}
+
+export function canonicalizeCriterionTitle(
+  rawCriterion: string,
+  officialList: string[]
+): { canonical: string; isOfficial: boolean } {
+  if (!rawCriterion) return { canonical: '', isOfficial: false };
+
+  const condensedRaw = condenseCriterionTitle(rawCriterion);
+  const lowerRaw = condensedRaw.toLowerCase();
+
+  // Tier 1: Exact match in official list
+  const exactOfficial = officialList.find(o => o.toLowerCase() === lowerRaw);
+  if (exactOfficial) {
+    return { canonical: exactOfficial, isOfficial: true };
+  }
+
+  // Tier 2: Substring or high-word-overlap match in official list
+  const normRaw = lowerRaw.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+  const rawWords = normRaw.split(' ').filter(w => w.length > 2 && w !== 'and');
+
+  for (const official of officialList) {
+    const normOfficial = official.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Substring inclusion (e.g. "Iterative Design Process" inside "Iterative Design Process & Evolution")
+    if (normOfficial.includes(normRaw) || normRaw.includes(normOfficial)) {
+      return { canonical: official, isOfficial: true };
+    }
+
+    // Word overlap (if >= 50% of significant words match)
+    if (rawWords.length > 0) {
+      const officialWords = normOfficial.split(' ').filter(w => w.length > 2 && w !== 'and');
+      const commonWords = rawWords.filter(w => officialWords.includes(w));
+      if (commonWords.length >= Math.max(1, Math.floor(rawWords.length * 0.5))) {
+        return { canonical: official, isOfficial: true };
+      }
+    }
+  }
+
+  // Tier 3: Additional Topic (Not matched to any Core Criteria)
+  return { canonical: condensedRaw, isOfficial: false };
+}
+
+export function normalizeCriterionString(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/^\d+[\.\)]\s*/, '') // Remove section numbering like "1.", "2)", "3. "
+    .replace(/\band\b/gi, '&')     // Convert "and" to "&"
+    .replace(/[^a-z0-9&]/gi, ' ')  // Keep alphanumeric and &
+    .replace(/\s+/g, ' ')          // Collapse spaces
+    .toLowerCase()
+    .trim();
+}
+
+export function isItemMatchingRubric(
+  item: { associatedCriterion?: string; title: string },
+  rubricFilter: string,
+  renderedPills: Array<{ criterion: string; rawCriterion?: string }> | string[] = []
+): boolean {
+  if (!rubricFilter) return true;
+
+  const filterNorm = normalizeCriterionString(rubricFilter);
+  const itemCritNorm = normalizeCriterionString(item?.associatedCriterion || '');
+
+  // Step 1: Exact or normalized string equality
+  if (itemCritNorm && filterNorm && itemCritNorm === filterNorm) {
+    return true;
+  }
+
+  // Step 2: If we have multiple pills, find which pill the item's associatedCriterion BEST matches!
+  if (Array.isArray(renderedPills) && renderedPills.length > 0 && itemCritNorm) {
+    let bestPillCriterion = '';
+    let maxOverlapScore = 0;
+
+    for (const p of renderedPills) {
+      const pCrit = typeof p === 'string' ? p : p?.criterion || '';
+      const pRaw = typeof p === 'string' ? p : p?.rawCriterion || '';
+
+      const pCritNorm = normalizeCriterionString(pCrit);
+      const pRawNorm = normalizeCriterionString(pRaw);
+
+      // Exact match with any pill display or raw criterion
+      if (itemCritNorm === pCritNorm || itemCritNorm === pRawNorm) {
+        bestPillCriterion = pCritNorm;
+        maxOverlapScore = 100;
+        break;
+      }
+
+      // Calculate word overlap score between itemCritNorm and pill
+      const itemWords = itemCritNorm.split(' ').filter(w => w.length > 2 && w !== '&');
+      const pWords = (pRawNorm || pCritNorm).split(' ').filter(w => w.length > 2 && w !== '&');
+
+      if (itemWords.length > 0 && pWords.length > 0) {
+        const commonWords = itemWords.filter(w => pWords.includes(w));
+        const score = commonWords.length / Math.max(itemWords.length, pWords.length);
+        if (score > maxOverlapScore && commonWords.length >= 2) {
+          maxOverlapScore = score;
+          bestPillCriterion = pCritNorm;
+        }
+      }
+    }
+
+    if (bestPillCriterion) {
+      return bestPillCriterion === filterNorm;
+    }
+  }
+
+  // Fallback 1: substring containment
+  if (itemCritNorm && filterNorm) {
+    if (itemCritNorm.includes(filterNorm) || filterNorm.includes(itemCritNorm)) {
+      return true;
+    }
+  }
+
+  // Fallback 2: Check if item title or exactPhrase overlaps with rubric filter
+  if (filterNorm && item) {
+    const titleNorm = normalizeCriterionString(item.title || '');
+    const phraseNorm = normalizeCriterionString((item as any).exactPhrase || (item as any).issueHighlight || (item as any).praiseHighlight || '');
+    if (titleNorm.length > 3 && filterNorm.length > 3) {
+      const filterWords = filterNorm.split(' ').filter(w => w.length > 3);
+      if (filterWords.some(w => titleNorm.includes(w) || phraseNorm.includes(w))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function calculateWeightedGrade(subScores?: SubScoreItem[] | null): string | null {
   if (!subScores || !Array.isArray(subScores) || subScores.length === 0) {
     return null;
@@ -130,11 +294,16 @@ export function splitCompoundSentence(sentence: string): string[] {
     }
   }
 
-  // Pattern 2: Infix contrast or parallel conjunctions: ", and ", "; and ", ", but ", "; however,", ", however,", ", yet ", ", whereas ", ", although ", ", as well as "
-  const infixRegex = /(.*?)(?:,\s*and\s+|;\s*and\s+|,\s*but\s+|;\s*however,?\s*|,\s*however,?\s*|,\s*yet\s+|,\s*whereas\s+|,\s*although\s+|,\s*as well as\s+)(.*)/i;
+  // Pattern 2: Infix recommendation & contrast transitions (e.g. ", here...", ", it would...", ", I would...", ", but ", "; however,", "-it would")
+  const infixRegex = /(.*?)(?:,\s*and\s+|;\s*and\s+|,\s*but\s+|;\s*however,?\s*|,\s*however,?\s*|,\s*yet\s+|,\s*whereas\s+|,\s*although\s+|,\s*as well as\s+|,\s*here\s+(?:it|I|you)|,\s*(?:it|you)\s+would\s+be|,\s*I\s+would\s+have|[\-,;]\s*it\s+would\s+have\s+been|[\-,;]\s*it\s+would\s+be)(.*)/i;
   const infixMatch = infixRegex.exec(trimmed);
   if (infixMatch && infixMatch[1].trim().length >= 12 && infixMatch[2].trim().length >= 12) {
-    return [infixMatch[1].trim(), infixMatch[2].trim()];
+    const splitIndex = infixMatch[1].length + 1; // Split right after the delimiter
+    const clauseA = trimmed.substring(0, splitIndex).replace(/[\-,;]$/, '').trim();
+    const clauseB = trimmed.substring(splitIndex).trim();
+    if (clauseA.length >= 12 && clauseB.length >= 12) {
+      return [clauseA, clauseB];
+    }
   }
 
   return [trimmed];
@@ -1447,12 +1616,20 @@ COMPILATION & REASONING RULES:
 2. GRADE BREAKDOWN (Rubrics/PBL Component Value Extraction):
    If the tutor feedback contains an explicit sub-scores breakdown, dimension grades, or weights (e.g., "Problem Framing & Contextual Understanding (40%): Very good (60-70)"), you MUST extract them into the "subScores" array. Do not return null if they exist in the feedback. If no such scores exist, set "subScores" to null.
 
-3. STRENGTHS & WEAKNESSES (Exhaustive Extraction & Example Merging):
-   - CRITICAL EXHAUSTIVE EXTRACTION WITH EXAMPLE MERGING:
-     * EXHAUSTIVE FULL-TEXT EXTRACTION: You MUST perform an exhaustive extraction of originalFeedbackText from top to bottom. Every distinct qualitative feedback sentence or observation MUST yield a corresponding entry in keyStrengths (if praising) or areasForImprovement (if critique). DO NOT skip or omit any qualitative feedback point!
-     * EXPLICIT EXAMPLE MERGING ONLY: Sentences starting with or containing explicit example/elaboration phrases ("For example...", "For instance...", "Such as...", "Specifically...", "e.g.", "You mention...", "Outcomes such as..."). MUST BE MERGED into the immediately preceding parent observation that they illustrate. DO NOT extract example/elaboration sentences as separate standalone items!
-     * DO NOT MERGE INDEPENDENT POINTS: Do NOT group or merge independent feedback points/sentences that discuss different topics, even if they appear in the same paragraph. Extract all independent points fully so that full-text coverage is 100% preserved.
-     * COMPLETE MULTI-SENTENCE ANCHORING: When an example sentence is merged into a parent point, the exactPhrase and anchor { start, end } for that item MUST span the full passage (parent sentence + merged example sentence verbatim from originalFeedbackText) so text highlighting covers both.
+3. HANDBOOK RUBRICS & ABSTRACT TAXONOMY TAGS EXTRACTION FLOW:
+   Identify the core evaluation criteria from the course handbook, rubrics, or subScores breakdown.
+   - WORD COUNT RULE (CRITICAL): If a criterion title has 5 words or fewer (<= 5 words), use the VERBATIM original title, replacing any "and" with "&" (e.g. "Problem Definition & Research", "User Research & Goals", "Scenarios & Tasks", "Communication Skills"). DO NOT forcibly summarize titles that are 5 words or fewer!
+   - Only if a criterion title has MORE THAN 5 words (> 5 words), summarize or condense it into a shorter 2-5 word tag (replacing "and" with "&").
+   Categorize every strength and area for improvement observation extracted from the feedback text:
+   - OFFICIAL RUBRIC TRACK (isOfficialRubric = true): If the remark aligns with handbook criteria or subScores dimensions, set "associatedCriterion" to that exact taxonomy tag and set "isOfficialRubric" to true.
+   - AI SELF-GENERALIZED TRACK (isOfficialRubric = false): If the remark discusses additional qualitative aspects, qualitatively summarize a short taxonomy tag (e.g. "Writing Style", "Presentation Format") and set "isOfficialRubric" to false.
+
+4. STRENGTHS & WEAKNESSES (Exhaustive Full-Text Extraction & Multi-Evidence Anchoring Rules):
+   - CRITICAL EXHAUSTIVE EXTRACTION (NO OMISSIONS):
+     * EXHAUSTIVE FULL-TEXT EXTRACTION: You MUST perform an exhaustive extraction of originalFeedbackText from top to bottom. Every qualitative feedback sentence, remark, or observation in the narrative text MUST yield a corresponding entry in keyStrengths (if praising) or areasForImprovement (if critique). You are STRICTLY FORBIDDEN from skipping, ignoring, or omitting any qualitative paragraph or sentence.
+     * NO UNBALANCED OMISSION: If a tutor paragraph contains 3 distinct feedback points, output 3 distinct items in your JSON array.
+     * MERGED EVIDENCE FULL-SPAN HIGHLIGHTING (CRITICAL): If you decide to group or merge multiple related evidence sentences into a single combined observation card, your "exactPhrase" field MUST contain the COMPLETE, UN-TRUNCATED, VERBATIM combined passage of ALL evidence sentences (from the start of the first sentence to the end of the last evidence sentence). Your "anchor" { "start", "end" } MUST cover the full range of all combined evidence sentences so that 100% of the underlying evidence is highlighted on the UI, rather than highlighting only a single sentence or fragment.
+     * DO NOT MERGE UNRELATED POINTS: Do NOT group or merge independent feedback points/sentences that discuss different topics, even if they appear in the same paragraph. Extract all independent points fully so that full-text coverage is 100% preserved.
    - SCORE BREAKDOWN STRIPPING: You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)", grade descriptions, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
    - FEEDBACK NARRATIVE SANDBOXING: You must lock your qualitative analysis sandbox strictly to the free-text prose commentary (e.g. general feedback or descriptive review paragraphs).
    - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise passage), and anchor coordinates { start, end } representing the precise character offset range of the praise passage inside originalFeedbackText.
@@ -1477,6 +1654,8 @@ The JSON object must strictly adhere to this TypeScript schema:
   "keyStrengths": Array<{
     "id": string (e.g., insight-1),
     "title": string (precise, unique descriptive title-case summary, e.g., "Robust Conceptual Design of Safety Audit Framework"),
+    "associatedCriterion": string (Short 2-4 word abstract taxonomy tag, e.g., "Problem Framing", "User Research", "Scenarios & Tasks"),
+    "isOfficialRubric": boolean (true if matching official handbook rubric, false if AI self-generalized),
     "praiseHighlight": string (micro-distillation of praise sentence),
     "exactPhrase": string (the complete, un-truncated, punctuation-terminated sentence matching the original feedback verbatim),
     "anchor": { "start": number, "end": number }
@@ -1484,6 +1663,8 @@ The JSON object must strictly adhere to this TypeScript schema:
   "areasForImprovement": Array<{
     "id": string (e.g., insight-2),
     "title": string (precise, unique descriptive title-case summary, e.g., "Align Theoretical Debates with Empirical Setup"),
+    "associatedCriterion": string (Short 2-4 word abstract taxonomy tag, e.g., "Problem Framing", "User Research", "Scenarios & Tasks"),
+    "isOfficialRubric": boolean (true if matching official handbook rubric, false if AI self-generalized),
     "issueHighlight": string (micro-distillation of issue sentence),
     "exactPhrase": string (the complete, un-truncated, punctuation-terminated sentence matching the original feedback verbatim),
     "anchor": { "start": number, "end": number }
@@ -1663,12 +1844,20 @@ export const generateMockSummativeParsedResponse = (
   const areasForImprovement: any[] = [];
   let strengthCount = 1;
   let improvementCount = 1;
-
   let searchCursor = 0;
+  let currentCriterion = '';
 
   lines.forEach((line) => {
     const trimmedLine = line.trim();
     if (!trimmedLine) return;
+
+    // Detect section headers / criterion headers like "1.Problem definition and design rationale-Excellent"
+    if (/^\d+[\s\.\)\-]+/.test(trimmedLine) || trimmedLine.includes('Rationale') || trimmedLine.includes('Prototyping') || trimmedLine.endsWith(':')) {
+      const cleanHeader = trimmedLine.replace(/^\d+[\s\.\)\-]+/, '').replace(/[\-\–]\s*(Excellent|Good|Pass|Fail|Satisfactory).*$/i, '').trim();
+      if (cleanHeader.length >= 4) {
+        currentCriterion = cleanHeader;
+      }
+    }
 
     // Check if this line is a header (no punctuation at the end of the line and relatively short)
     const isHeader = trimmedLine.length < 50 && !/[.!?]$/.test(trimmedLine) && (trimmedLine.toLowerCase().includes('indicator') || trimmedLine.toLowerCase().includes('calculation') || trimmedLine.endsWith(':'));
@@ -1713,7 +1902,7 @@ export const generateMockSummativeParsedResponse = (
         'referencing', 'calculations', 'explained', 'minimising', 'effective', 'solid', 
         'rigorous', 'thorough', 'useful', 'appropriate', 'clearer', 'positive', 'linked causally',
         'is discussed', 'presented', 'clever', 'articulated'
-      ].some(w => lower.includes(w));
+      ].some(w => lower.includes(w)) && !/would\s+have\s+been\s+good|would\s+be\s+good|could\s+have\s+been|should\s+have\s+been/i.test(lower);
 
       const isBad = [
         'lack', 'lacks', 'however', 'but', 'should', 'would have helped', 'help', 'polished', 
@@ -1721,7 +1910,8 @@ export const generateMockSummativeParsedResponse = (
         'gap', 'gaps', 'difficult', 'unclear', 'not ', 'not', 'no ', 'without', 'missing', 
         'unclarified', 'unexplained', 'lower', 'harder', 'require', 'requires', 'unshared', 
         'incomplete', 'abrupt', 'excessive', 'imprecise', 'inadequate', 'unconsidered', 
-        'harder to follow', 'earlier', 'further explanation', 'needs', 'need', 'brief', 'depth'
+        'harder to follow', 'earlier', 'further explanation', 'needs', 'need', 'brief', 'depth',
+        'would have been good', 'would be good', 'could showcase', 'could include', 'should showcase', 'should include'
       ].some(w => lower.includes(w));
 
       let startOffset = rawText.indexOf(trimmed, searchCursor);
@@ -1739,31 +1929,14 @@ export const generateMockSummativeParsedResponse = (
 
       let title = generateTitleFromSentence(trimmed);
 
-      // MANDATORY THEMATIC MERGING FOR EXAMPLES & ELABORATIONS
-      const isExampleOrElaboration = /^(for\s+example|for\s+instance|such\s+as|specifically|e\.g\.|you\s+mention|outcomes\s+such\s+as|in\s+particular|as\s+an\s+illustration|this\s+includes|including|which\s+means|meaning)\b/i.test(trimmed);
-
-      if (isExampleOrElaboration) {
-        if (areasForImprovement.length > 0) {
-          const lastItem = areasForImprovement[areasForImprovement.length - 1];
-          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
-          lastItem.issueHighlight = `${lastItem.issueHighlight} ${trimmed}`;
-          lastItem.anchor.end = endOffset;
-          return;
-        } else if (keyStrengths.length > 0) {
-          const lastItem = keyStrengths[keyStrengths.length - 1];
-          lastItem.exactPhrase = `${lastItem.exactPhrase} ${trimmed}`;
-          lastItem.praiseHighlight = `${lastItem.praiseHighlight} ${trimmed}`;
-          lastItem.anchor.end = endOffset;
-          return;
-        }
-      }
-
       if (isBad && !isGood) {
         areasForImprovement.push({
           id: `improvement-${improvementCount++}`,
           title,
           issueHighlight: trimmed,
           exactPhrase: trimmed,
+          associatedCriterion: currentCriterion || undefined,
+          isOfficialRubric: Boolean(currentCriterion),
           anchor: { start: startOffset, end: endOffset }
         });
       } else if (isGood && !isBad) {
@@ -1772,6 +1945,8 @@ export const generateMockSummativeParsedResponse = (
           title,
           praiseHighlight: trimmed,
           exactPhrase: trimmed,
+          associatedCriterion: currentCriterion || undefined,
+          isOfficialRubric: Boolean(currentCriterion),
           anchor: { start: startOffset, end: endOffset }
         });
       } else {
@@ -1782,6 +1957,8 @@ export const generateMockSummativeParsedResponse = (
             title,
             issueHighlight: trimmed,
             exactPhrase: trimmed,
+            associatedCriterion: currentCriterion || undefined,
+            isOfficialRubric: Boolean(currentCriterion),
             anchor: { start: startOffset, end: endOffset }
           });
         } else {
@@ -1790,6 +1967,8 @@ export const generateMockSummativeParsedResponse = (
             title,
             praiseHighlight: trimmed,
             exactPhrase: trimmed,
+            associatedCriterion: currentCriterion || undefined,
+            isOfficialRubric: Boolean(currentCriterion),
             anchor: { start: startOffset, end: endOffset }
           });
         }

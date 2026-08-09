@@ -992,7 +992,12 @@ export const SourceSidebar: React.FC = () => {
                         tagColor: depthColor,
                         type: vp.type
                       });
-                      setRoute('archive-asset-detail');
+                      const activate = useAppStore.getState().activateProjectFromArchive;
+                      if (activate) {
+                        activate(vp.id);
+                      } else {
+                        setRoute('archive-asset-detail');
+                      }
                     }
                   }}
                   className={`group flex items-center justify-between py-1 px-2 ${bubbleStyle} w-full min-w-0 transition-all cursor-pointer select-none relative`}

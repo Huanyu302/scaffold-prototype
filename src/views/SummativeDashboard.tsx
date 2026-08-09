@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, FileText, FileInput, Loader2, AlertCircle, GraduationCap, Layers, ChevronUp, ChevronDown, MessageSquare, BookOpen, X, CheckCircle2, FolderOpen, Plus, Rocket, Pencil, Check } from 'lucide-react';
+import { ArrowRight, Sparkles, FileText, FileInput, Loader2, AlertCircle, GraduationCap, Layers, ChevronUp, ChevronDown, MessageSquare, BookOpen, X, CheckCircle2, FolderOpen, Plus, Rocket, Pencil, Check, Info } from 'lucide-react';
 import { useAppStore, compileMaterialTexts, SummativeAcademicRecommendation, SummativeAdvancedExploration } from '../store/useAppStore';
 import { RadarChartWrapper } from '../components/deconstruct/RadarChartWrapper';
 import { ScoreBarGroup } from '../components/deconstruct/ScoreBarGroup';
 import { OriginalTextPanel } from '../components/deconstruct/OriginalTextPanel';
 import { DocumentViewer } from '../components/deconstruct/DocumentViewer';
 import { FreeformCopilotChat } from '../components/chat/FreeformCopilotChat';
-import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade, formatDimensionTitle } from '../utils/geminiService';
+import { processSummativeFeedback, generateMockSummativeParsedResponse, alignGlobalSummaryWithGrade, calculateWeightedGrade, formatDimensionTitle, condenseCriterionTitle, canonicalizeCriterionTitle, isItemMatchingRubric } from '../utils/geminiService';
 import { OverlayScrollbarBox } from '../components/common/OverlayScrollbarBox';
 
 const getContributionRange = (scoreStr: string, weightPct: number) => {
@@ -90,6 +90,7 @@ export const SummativeDashboard: React.FC = () => {
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(true);
   const [activeRightTab, setActiveRightTab] = useState<'transcript' | 'chatbox' | 'document' | 'input'>('chatbox');
   const [outcomeFilter, setOutcomeFilter] = useState<'good' | 'bad' | null>(null);
+  const [rubricFilter, setRubricFilter] = useState<string | null>(null);
   const [activeLeftTab, setActiveLeftTab] = useState<'briefing' | 'longterm'>('briefing');
 
   useEffect(() => {
@@ -97,6 +98,25 @@ export const SummativeDashboard: React.FC = () => {
       setHasUnreadChatNotification(false);
     }
   }, [activeRightTab, setHasUnreadChatNotification]);
+
+  useEffect(() => {
+    if (summativeFeedbackData) {
+      setIsEditing(false);
+      setActiveRightTab('chatbox');
+      setActiveLeftTab('briefing');
+      if (summativeFeedbackData.originalFeedbackText) {
+        setInputText(summativeFeedbackData.originalFeedbackText);
+      }
+      if (summativeFeedbackData.grade && summativeFeedbackData.grade !== '?') {
+        setFinalGrade(summativeFeedbackData.grade);
+      }
+    } else {
+      setInputText('');
+      setFinalGrade('');
+      setIsEditing(false);
+      setActiveRightTab('input');
+    }
+  }, [activeProject?.projectId, summativeFeedbackData]);
 
   const academicInsightsRef = React.useRef<HTMLDivElement>(null);
   const futureExplorationsRef = React.useRef<HTMLDivElement>(null);
@@ -253,6 +273,88 @@ export const SummativeDashboard: React.FC = () => {
 
   const strengths = summativeFeedbackData?.keyStrengths || [];
   const critiques = summativeFeedbackData?.areasForImprovement || [];
+
+  const renderedRubrics = (() => {
+    const coreList: Array<{ criterion: string; rawCriterion: string; isOfficialRubric: boolean }> = [];
+    const additionalList: Array<{ criterion: string; rawCriterion: string; isOfficialRubric: boolean }> = [];
+
+    const hasSubScores = Boolean(summativeFeedbackData?.subScores && summativeFeedbackData.subScores.length > 0);
+
+    // Step 1: Core Criteria - EXCLUSIVELY populated from subScores (Grade Breakdown data source)
+    if (hasSubScores) {
+      summativeFeedbackData!.subScores!.forEach(s => {
+        if (s.dimension) {
+          const displayTitle = condenseCriterionTitle(s.dimension);
+          if (!coreList.some(c => c.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+            coreList.push({
+              criterion: displayTitle,
+              rawCriterion: s.dimension,
+              isOfficialRubric: true
+            });
+          }
+        }
+      });
+    }
+
+    // Step 2: Process observation items from data source (keyStrengths & areasForImprovement)
+    const obsList = [...strengths, ...critiques];
+    const officialCoreTitles = coreList.map(c => c.criterion);
+
+    obsList.forEach(item => {
+      const rawCrit = (item as any).associatedCriterion;
+      if (rawCrit) {
+        const { canonical, isOfficial } = canonicalizeCriterionTitle(rawCrit, officialCoreTitles);
+        const displayTitle = condenseCriterionTitle(canonical || rawCrit);
+
+        if (hasSubScores) {
+          // When subScores exist, check if rawCrit / canonical belongs to any Core Criteria in coreList
+          const isCoveredInCore = coreList.some(c => {
+            const cNorm = c.criterion.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const rawNorm = c.rawCriterion.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const candNorm = displayTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+            const itemCritNorm = rawCrit.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\band\b/g, '').trim();
+
+            return (
+              cNorm === candNorm ||
+              rawNorm === itemCritNorm ||
+              cNorm.includes(candNorm) ||
+              candNorm.includes(cNorm) ||
+              rawNorm.includes(itemCritNorm) ||
+              itemCritNorm.includes(rawNorm)
+            );
+          });
+
+          if (!isCoveredInCore && !additionalList.some(a => a.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+            additionalList.push({
+              criterion: displayTitle,
+              rawCriterion: rawCrit,
+              isOfficialRubric: false
+            });
+          }
+        } else {
+          if (isOfficial) {
+            if (!coreList.some(c => c.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+              coreList.push({
+                criterion: displayTitle,
+                rawCriterion: rawCrit,
+                isOfficialRubric: true
+              });
+            }
+          } else {
+            if (!additionalList.some(a => a.criterion.toLowerCase() === displayTitle.toLowerCase())) {
+              additionalList.push({
+                criterion: displayTitle,
+                rawCriterion: rawCrit,
+                isOfficialRubric: false
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return [...coreList, ...additionalList];
+  })();
 
 
   const getScoreBadgeClass = (scoreStr: string): string => {
@@ -518,129 +620,108 @@ export const SummativeDashboard: React.FC = () => {
                 <OverlayScrollbarBox className="h-full" paddingClassName="p-5">
                   <div className="flex flex-col gap-2.5 min-h-full pb-2">
                     {/* Executive Dashboard Overview */}
-                    {!isOverviewExpanded ? (
-                      /* Collapsed Dashboard Bar */
-                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-2.5 shadow-sm h-11 box-border flex items-center justify-between gap-4 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Grade</span>
+                    <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-4 shadow-sm h-auto box-border flex flex-col justify-between gap-3.5 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
+                      <div className="flex justify-between items-center w-full">
+                        <div className="flex items-center gap-1.5 select-none">
+                          <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none whitespace-nowrap">Grade</span>
                           {(() => {
                             const rawGrade = summativeFeedbackData?.grade;
                             const isExplicitGrade = Boolean(rawGrade && rawGrade !== "?" && !summativeFeedbackData?.isAutoCalculated);
                             const computedGrade = calculateWeightedGrade(summativeFeedbackData?.subScores);
                             const effectiveGrade = rawGrade && rawGrade !== "?" ? rawGrade : (computedGrade || "?");
                             const isAICalculated = Boolean(summativeFeedbackData?.isAutoCalculated || (!isExplicitGrade && computedGrade));
-                            return (
-                              <div className="flex items-center gap-1.5">
-                                <div className="inline-flex items-center justify-center bg-blue-50 border border-blue-100 text-brand-summative-primary font-heading font-extrabold text-[10px] px-2 py-0.5 rounded-md select-none whitespace-nowrap">
-                                  {effectiveGrade}
+
+                            if (effectiveGrade !== "?") {
+                              const style = getOverallGradeStyle(effectiveGrade);
+                              return (
+                                <div className="flex items-center gap-1.5">
+                                  <div className={`inline-flex items-center justify-center font-heading font-extrabold text-xs px-2.5 py-0.5 rounded-full relative overflow-hidden whitespace-nowrap animate-in zoom-in-95 duration-250 ${style.container}`}>
+                                    <span className="relative z-10">{effectiveGrade}</span>
+                                    <span className={`absolute inset-0 animate-pulse rounded-full pointer-events-none ${style.pulse}`} />
+                                  </div>
+                                  {isAICalculated && (
+                                    <span className="text-[10px] font-sf-pro font-medium text-slate-400 select-none whitespace-nowrap">
+                                      (Auto-calculated)
+                                    </span>
+                                  )}
                                 </div>
-                                {isAICalculated && (
-                                  <span className="text-[9px] font-sf-pro font-medium text-slate-400 select-none whitespace-nowrap">
-                                    (Auto-calculated)
-                                  </span>
-                                )}
+                              );
+                            }
+                            return (
+                              <div className="w-7 h-7 rounded-full bg-transparent border border-slate-200 flex items-center justify-center text-xs font-heading font-extrabold text-slate-400 whitespace-nowrap">
+                                ?
                               </div>
                             );
                           })()}
                         </div>
 
-                        <button
-                          onClick={() => setIsOverviewExpanded(true)}
-                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center"
-                          title="Expand Overview"
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      /* Real Briefing Card */
-                      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl p-4 shadow-sm min-h-[160px] h-auto box-border flex flex-col justify-between gap-3.5 flex-shrink-0 hover:bg-white transition-colors duration-200 select-none">
-                        <div className="flex justify-between items-center w-full">
-                          <div className="flex items-center gap-1.5 select-none">
-                            <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none whitespace-nowrap">Grade</span>
-                            {(() => {
-                              const rawGrade = summativeFeedbackData?.grade;
-                              const isExplicitGrade = Boolean(rawGrade && rawGrade !== "?" && !summativeFeedbackData?.isAutoCalculated);
-                              const computedGrade = calculateWeightedGrade(summativeFeedbackData?.subScores);
-                              const effectiveGrade = rawGrade && rawGrade !== "?" ? rawGrade : (computedGrade || "?");
-                              const isAICalculated = Boolean(summativeFeedbackData?.isAutoCalculated || (!isExplicitGrade && computedGrade));
-
-                              if (effectiveGrade !== "?") {
-                                const style = getOverallGradeStyle(effectiveGrade);
-                                return (
-                                  <div className="flex items-center gap-1.5">
-                                    <div className={`inline-flex items-center justify-center font-heading font-extrabold text-xs px-2.5 py-0.5 rounded-full relative overflow-hidden whitespace-nowrap animate-in zoom-in-95 duration-250 ${style.container}`}>
-                                      <span className="relative z-10">{effectiveGrade}</span>
-                                      <span className={`absolute inset-0 animate-pulse rounded-full pointer-events-none ${style.pulse}`} />
-                                    </div>
-                                    {isAICalculated && (
-                                      <span className="text-[10px] font-sf-pro font-medium text-slate-400 select-none whitespace-nowrap">
-                                        (Auto-calculated)
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return (
-                                <div className="w-7 h-7 rounded-full bg-transparent border border-slate-200 flex items-center justify-center text-xs font-heading font-extrabold text-slate-400 whitespace-nowrap">
-                                  ?
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="flex items-center gap-2 select-none">
-                            {outcomeFilter !== null && (
-                              <button
-                                onClick={() => setOutcomeFilter(null)}
-                                className="text-[10px] font-sf-pro font-medium text-slate-400 hover:text-rose-500 transition-colors mr-2 cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                              >
-                                <X className="w-3 h-3 text-slate-400 hover:text-rose-500" />
-                                <span>Clear filters</span>
-                              </button>
-                            )}
+                        <div className="flex items-center gap-2 select-none">
+                          {(outcomeFilter !== null || rubricFilter !== null) && (
                             <button
-                              onClick={() => setIsOverviewExpanded(false)}
-                              className="p-1 text-slate-400 hover:text-slate-655 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center"
-                              title="Collapse Overview"
+                              onClick={() => {
+                                setOutcomeFilter(null);
+                                setRubricFilter(null);
+                              }}
+                              className="text-[10px] font-sf-pro font-medium text-slate-400 hover:text-rose-500 transition-colors mr-2 cursor-pointer flex items-center gap-1 whitespace-nowrap"
                             >
-                              <ChevronUp className="w-3.5 h-3.5" />
+                              <X className="w-3 h-3 text-slate-400 hover:text-rose-500" />
+                              <span>Clear filters</span>
                             </button>
-                          </div>
+                          )}
+                          <button
+                            onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
+                            className="p-1 text-slate-400 hover:text-slate-655 hover:bg-slate-50 border border-slate-150 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center"
+                            title={isOverviewExpanded ? "Collapse Breakdown & Summary" : "Expand Breakdown & Summary"}
+                          >
+                            {isOverviewExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
+                      </div>
 
-                        <div className="border-t border-slate-100/60 pt-2 flex flex-col gap-1.5 select-text flex-shrink-0">
-                          <div className="flex justify-between items-center w-full select-none">
-                            <div className="flex items-center gap-1.5 select-none">
-                              <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Grade Breakdown</span>
-                              {(!summativeFeedbackData.subScores || summativeFeedbackData.subScores.length === 0) && (
-                                <span className="text-[11px] font-sf-pro font-normal text-slate-400 select-none">(not mentioned)</span>
-                              )}
+                      {/* Collapsible Section: Grade Breakdown + Summary Text */}
+                      {isOverviewExpanded && (
+                        <>
+                          <div className="border-t border-slate-100/60 pt-2 flex flex-col gap-1.5 select-text flex-shrink-0">
+                            <div className="flex justify-between items-center w-full select-none">
+                              <div className="flex items-center gap-1.5 select-none">
+                                <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Grade Breakdown</span>
+                                {(!summativeFeedbackData.subScores || summativeFeedbackData.subScores.length === 0) && (
+                                  <span className="text-[11px] font-sf-pro font-normal text-slate-400 select-none">(not mentioned)</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          {summativeFeedbackData.subScores && summativeFeedbackData.subScores.length > 0 ? (
-                            <div className="flex flex-col gap-1 bg-slate-50/50 border border-slate-100 rounded-lg p-2 animate-in fade-in duration-300">
-                              {summativeFeedbackData.subScores.map((scoreItem, sIdx) => (
-                                <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
-                                  <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
-                                    <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
-                                      {formatDimensionTitle(scoreItem.dimension)}
-                                    </span>
-                                    {scoreItem.weight && (
-                                      <span className="font-semibold text-slate-700 flex-shrink-0 self-center">
-                                        {scoreItem.weight.startsWith('(') ? scoreItem.weight : `(${scoreItem.weight})`}
+                            {summativeFeedbackData.subScores && summativeFeedbackData.subScores.length > 0 ? (
+                              <div className="flex flex-col gap-1 bg-slate-50/50 border border-slate-100 rounded-lg p-2 animate-in fade-in duration-300">
+                                {summativeFeedbackData.subScores.map((scoreItem, sIdx) => (
+                                  <div key={sIdx} className="flex justify-between items-center gap-3.5 text-[11px] py-1 border-b border-dashed border-slate-100 last:border-b-0">
+                                    <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                                      <span className="font-semibold text-slate-700 whitespace-normal break-words leading-relaxed text-left">
+                                        {formatDimensionTitle(scoreItem.dimension)}
                                       </span>
-                                    )}
+                                      {scoreItem.weight && (
+                                        <span className="font-semibold text-slate-700 flex-shrink-0 self-center">
+                                          {scoreItem.weight.startsWith('(') ? scoreItem.weight : `(${scoreItem.weight})`}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className={`font-heading flex-shrink-0 whitespace-nowrap self-center ${getScoreBadgeClass(scoreItem.score)}`}>
+                                      {scoreItem.score}
+                                    </span>
                                   </div>
-                                  <span className={`font-heading flex-shrink-0 whitespace-nowrap self-center ${getScoreBadgeClass(scoreItem.score)}`}>
-                                    {scoreItem.score}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {/* globalSummary text container */}
+                          <div className="border-t border-slate-100/60 pt-3 select-text flex-shrink-0">
+                            <p className="text-[11.5px] text-slate-650 font-sf-pro leading-loose block break-words text-left">
+                              {alignGlobalSummaryWithGrade(summativeFeedbackData.globalSummary, summativeFeedbackData.grade === '?' ? '' : summativeFeedbackData.grade)}
+                            </p>
+                          </div>
+                        </>
+                      )}
 
                         {/* Outcomes Metrics Badges (Interactive Buttons) */}
                         <div className="flex items-center justify-start gap-2.5 w-full border-t border-slate-100/60 pt-2 flex-shrink-0 select-none">
@@ -664,6 +745,7 @@ export const SummativeDashboard: React.FC = () => {
 
                           <button
                             onClick={() => {
+                              setRubricFilter(null);
                               setOutcomeFilter(outcomeFilter === 'bad' ? null : 'bad');
                             }}
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-heading font-bold cursor-pointer whitespace-nowrap border ${outcomeFilter === 'bad'
@@ -679,14 +761,87 @@ export const SummativeDashboard: React.FC = () => {
                           </button>
                         </div>
 
-                        {/* Bottom Row: globalSummary text container (Flexible Height) */}
-                        <div className="border-t border-slate-150 pt-3 select-text flex-shrink-0">
-                          <p className="text-[11.5px] text-slate-650 font-sf-pro leading-loose block break-words text-left">
-                            {alignGlobalSummaryWithGrade(summativeFeedbackData.globalSummary, summativeFeedbackData.grade === '?' ? '' : summativeFeedbackData.grade)}
-                          </p>
-                        </div>
+                        {/* Group 1: Core Criteria */}
+                        {renderedRubrics && renderedRubrics.some(r => r.isOfficialRubric) && (
+                          <div className="flex flex-col gap-2 border-t border-slate-100/60 pt-2 flex-shrink-0 select-none">
+                            <div className="flex items-center gap-1.5 select-none">
+                              <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Core Criteria</span>
+                              <div className="relative group/info flex items-center">
+                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" />
+                                <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover/info:block w-64 p-2.5 bg-slate-900 text-white text-[10.5px] font-sf-pro leading-relaxed rounded-xl shadow-xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                  Core Criteria are linked directly to official handbook evaluation dimensions.
+                                  <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-900" />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {renderedRubrics.filter(r => r.isOfficialRubric).map((rub, rIdx) => {
+                                const isActive = rubricFilter?.toLowerCase() === rub.criterion.toLowerCase();
+                                return (
+                                  <button
+                                    key={`sum-rub-off-${rIdx}`}
+                                    onClick={() => {
+                                      setOutcomeFilter(null);
+                                      setRubricFilter(isActive ? null : rub.criterion);
+                                    }}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full text-[9.5px] font-sf-pro font-medium cursor-pointer whitespace-nowrap transition-all ${
+                                      isActive
+                                        ? 'bg-[#E8F0FE] text-[#1A73E8] border-[#1A73E8]/45 shadow-2xs'
+                                        : rubricFilter
+                                        ? 'bg-slate-100/60 border-slate-200/40 text-slate-400 opacity-50'
+                                        : 'bg-slate-100/80 border-slate-200/60 text-slate-650 hover:bg-slate-200/70 hover:text-slate-900'
+                                    }`}
+                                    title={isActive ? `Clear "${rub.criterion}" filter` : `Filter by "${rub.criterion}"`}
+                                  >
+                                    <span>{rub.criterion}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Group 2: Additional Topics */}
+                        {renderedRubrics && renderedRubrics.some(r => !r.isOfficialRubric) && (
+                          <div className="flex flex-col gap-2 border-t border-slate-100/60 pt-2 flex-shrink-0 select-none">
+                            <div className="flex items-center gap-1.5 select-none">
+                              <span className="text-[11px] font-sf-pro font-medium text-slate-500 tracking-normal select-none">Additional Topics</span>
+                              <div className="relative group/info flex items-center">
+                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" />
+                                <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover/info:block w-64 p-2.5 bg-slate-900 text-white text-[10.5px] font-sf-pro leading-relaxed rounded-xl shadow-xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                  Additional Topics are generalized by AI based on qualitative commentary; students should evaluate AI-generated insights critically and cautiously.
+                                  <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-900" />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {renderedRubrics.filter(r => !r.isOfficialRubric).map((rub, rIdx) => {
+                                const isActive = rubricFilter?.toLowerCase() === rub.criterion.toLowerCase();
+                                return (
+                                  <button
+                                    key={`sum-rub-cust-${rIdx}`}
+                                    onClick={() => {
+                                      setOutcomeFilter(null);
+                                      setRubricFilter(isActive ? null : rub.criterion);
+                                    }}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full text-[9.5px] font-sf-pro font-medium cursor-pointer whitespace-nowrap transition-all ${
+                                      isActive
+                                        ? 'bg-[#E8F0FE] text-[#1A73E8] border-[#1A73E8]/45 shadow-2xs'
+                                        : rubricFilter
+                                        ? 'bg-slate-100/60 border-slate-200/40 text-slate-400 opacity-50'
+                                        : 'bg-slate-100/80 border-slate-200/60 text-slate-650 hover:bg-slate-200/70 hover:text-slate-900'
+                                    }`}
+                                    title={isActive ? `Clear "${rub.criterion}" filter` : `Filter by "${rub.criterion}"`}
+                                  >
+                                    <span>{rub.criterion}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
 
                     {/* Key Observations / Insights List (Formative-style layout) */}
                     <div className="flex flex-col gap-2.5 border-t border-slate-150 pt-4 flex-shrink-0">
@@ -697,9 +852,14 @@ export const SummativeDashboard: React.FC = () => {
                         ].sort((a, b) => a.anchor.start - b.anchor.start);
 
                         const filteredObservations = combinedObservations.filter(item => {
-                          if (outcomeFilter === 'good') return item.type === 'good';
-                          if (outcomeFilter === 'bad') return item.type === 'bad';
-                          return true;
+                          const matchesOutcome = !outcomeFilter || 
+                            (outcomeFilter === 'good' && item.type === 'good') ||
+                            (outcomeFilter === 'bad' && item.type === 'bad');
+                          
+                          if (!matchesOutcome) return false;
+                          if (!rubricFilter) return true;
+
+                          return isItemMatchingRubric(item, rubricFilter, renderedRubrics);
                         });
 
                         if (filteredObservations.length === 0) {
@@ -748,24 +908,18 @@ export const SummativeDashboard: React.FC = () => {
                                 className="flex items-center flex-shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                {/* Read More Tooltip Wrapper */}
-                                <div className="relative group/tooltip">
-                                  <button
-                                    onClick={() => handleDimensionHighlight(item.anchor.start, item.anchor.end, item.exactPhrase)}
-                                    className={`p-1.5 border rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
-                                      isFirstItem && isFlashingBriefingBtn
-                                        ? 'border-[#1A73E8] bg-blue-100 text-blue-700 ring-2 ring-blue-400/80 scale-105 shadow-md animate-flash-once z-20'
-                                        : (isSelected
-                                            ? 'border-slate-300 bg-brand-summative-light/12 text-brand-summative-primary'
-                                            : 'border-slate-200 hover:border-brand-summative-primary/50 text-slate-500 hover:bg-brand-summative-light/20 hover:text-brand-summative-primary')
-                                    }`}
-                                  >
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                  </button>
-                                  <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 pointer-events-none bg-slate-800 text-white text-[9px] px-2.5 py-1 rounded shadow-md border border-slate-700 whitespace-nowrap z-50">
-                                    Locate Excerpt
-                                  </div>
-                                </div>
+                                <button
+                                  onClick={() => handleDimensionHighlight(item.anchor.start, item.anchor.end, item.exactPhrase)}
+                                  className={`p-1.5 border rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 ${
+                                    isFirstItem && isFlashingBriefingBtn
+                                      ? 'border-[#1A73E8] bg-blue-100 text-blue-700 ring-2 ring-blue-400/80 scale-105 shadow-md animate-flash-once z-20'
+                                      : (isSelected
+                                          ? 'border-slate-300 bg-brand-summative-light/12 text-brand-summative-primary'
+                                          : 'border-slate-200 hover:border-brand-summative-primary/50 text-slate-500 hover:bg-brand-summative-light/20 hover:text-brand-summative-primary')
+                                  }`}
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
                           );

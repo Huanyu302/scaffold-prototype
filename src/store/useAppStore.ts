@@ -442,6 +442,7 @@ export interface AppGlobalState {
   setHighlightedTextRange: (range: { start: number; end: number; exactPhrase?: string; timestamp?: number } | FileLocationAnchor | null) => void;
   setActiveAnchorContext: (context: { issueId: string; timestamp: number } | null) => void;
   archiveProjectToLongTermAsset: () => Promise<void>;
+  activateProjectFromArchive: (projectId: string) => void;
 }
 
 // ==========================================
@@ -2974,6 +2975,52 @@ Smith, J. (2019). Autonomous Lane Keeping. Journal of Driving Science. [Inconsis
       },
       pastProjects: [...get().pastProjects, archivedProj],
       currentRoute: 'global-competency'
+    });
+  },
+
+  activateProjectFromArchive: (projectId: string) => {
+    const pastProjects = get().pastProjects;
+    let targetProject = pastProjects.find(p => p.projectId === projectId || p.projectName.toLowerCase() === projectId.toLowerCase() || (p as any).id === projectId);
+    
+    if (!targetProject && pastProjects.length > 0) {
+      targetProject = pastProjects.find(p => projectId.includes(p.courseCode) || p.projectId.includes(projectId)) || pastProjects[0];
+    }
+
+    if (!targetProject) return;
+
+    const materials = targetProject.attachedMaterials || targetProject.summativeMaterials || [];
+    const { courseHandbookText, currentAssignmentText } = compileMaterialTexts(materials);
+
+    const proj = {
+      projectId: targetProject.projectId,
+      projectName: targetProject.projectName,
+      courseCode: targetProject.courseCode,
+      courseName: targetProject.courseName,
+      semester: targetProject.semester,
+      feedbackType: targetProject.feedbackType,
+      attachedMaterials: materials,
+      summativeMaterials: targetProject.summativeMaterials || materials
+    };
+
+    const isSummative = targetProject.feedbackType === 'summative';
+    const firstRound = targetProject.formativeRounds && targetProject.formativeRounds.length > 0 ? targetProject.formativeRounds[0] : null;
+
+    set({
+      activeProject: proj,
+      summativeFeedbackData: targetProject.summativeFeedbackData || null,
+      formativeRounds: targetProject.formativeRounds || (firstRound ? [firstRound] : []),
+      activeRoundId: isSummative ? 'round-summative-final' : (firstRound ? firstRound.id : undefined),
+      todoList: targetProject.todoList || [],
+      versionHistoryTree: targetProject.versionHistoryTree || {},
+      currentVersionId: targetProject.currentVersionId || undefined,
+      aiValidationResult: targetProject.aiValidationResult || null,
+      isLaunched: true,
+      sidebarMode: 'project-active',
+      activeLeftTab: 'briefing',
+      activeRightTab: 'chatbox',
+      courseHandbookText,
+      currentAssignmentText,
+      currentRoute: isSummative ? 'summative-dashboard' : 'formative-sandbox'
     });
   },
 
