@@ -64,21 +64,12 @@ export function condenseCriterionTitle(dimension: string): string {
   // 2. Replace all occurrences of "and" with "&"
   cleanTitle = cleanTitle.replace(/\band\b/gi, '&');
 
-  // 3. Remove verbose introductory action prefixes if phrase is wordy (e.g. "Evaluation of Market..." -> "Market, User & Contextual Needs")
+  // 3. Remove verbose introductory action prefixes (e.g. "Evaluation of Market..." -> "Market, User & Contextual Needs")
   cleanTitle = cleanTitle
     .replace(/^(?:Evaluation of|Generation of|Application of|Assessment of)\s+/gi, '')
     .trim();
 
-  // Count words in the title
-  const words = cleanTitle.split(/\s+/).filter(Boolean);
-
-  // RULE: If 5 words or fewer, DO NOT forcibly summarize! Return original title with &
-  if (words.length <= 5) {
-    return cleanTitle;
-  }
-
-  // Fallback for > 5 words: take first 5 words
-  return words.slice(0, 5).join(' ').replace(/\band\b/gi, '&');
+  return cleanTitle;
 }
 
 export function canonicalizeCriterionTitle(
@@ -1704,7 +1695,7 @@ COMPILATION & REASONING RULES:
 3. HANDBOOK RUBRICS & ABSTRACT TAXONOMY TAGS EXTRACTION FLOW:
    Identify the core evaluation criteria from the course handbook, rubrics, or subScores breakdown.
    - SOURCING HIERARCHY & TWO-STEP REGIONAL TARGETING (CRITICAL):
-     * TIER 1 (GRADE BREAKDOWN PRIORITY): If explicit subScores/grade breakdown exist in the feedback text, extract their exact dimension titles as Core Criteria.
+     * TIER 1 (GRADE BREAKDOWN PRIORITY): If explicit subScores/grade breakdown exist in the feedback text, extract their exact dimension titles as Core Criteria. You MUST use 100% VERBATIM dimension titles directly from the breakdown text without any word count limits or length truncation.
      * TIER 2 (COURSE HANDBOOK REGIONAL MATCHING - NO LAZY FIRST TABLE): If NO subScores exist in the feedback text, scan the COURSE HANDBOOK CONTEXT for the official Rubric table corresponding to THIS specific evaluation phase:
        - MANDATE AGAINST LAZY FIRST-TABLE PICKING: DO NOT subconsciously or lazily read the first table encountered in the document! PDF handbooks often place the Interim/Formative table on early pages. You MUST scan section/chapter headings first to locate the specific section for 'Summative Assessment', 'Final Evaluation', 'Final Portfolio', or 'End-of-Term Assessment'. Only extract criteria from the rubric table situated INSIDE that Final/Summative section! You are STRICTLY FORBIDDEN from extracting criteria from 'Formative', 'Interim', 'Draft', or 'Mid-term' rubric tables when parsing a Summative evaluation!
        - CRITERIA EXTRACTION (VERBATIM CORE WORDS ONLY): Once the Summative/Final rubric table is located, extract the criterion titles from its 'Criteria' column. You MUST use the VERBATIM original wording or exact words extracted directly from the original phrase. ABSOLUTE PROHIBITION: You are STRICTLY FORBIDDEN from performing synonym replacements, semantic paraphrasing, or inventing external summary terms (e.g. do NOT substitute 'Problem Definition' with 'Problem Framing' if the text says 'Problem Definition'). Strip any "(ILO1)", "(ILO2)" or ILO numbers, convert "and" to "&", and preserve the original wording. Do NOT include page numbers or source metadata.
