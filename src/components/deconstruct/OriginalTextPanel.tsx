@@ -227,41 +227,48 @@ export const OriginalTextPanel: React.FC<OriginalTextPanelProps> = ({
     if (rawPhrase) {
       const lowerNorm = normalizedText.toLowerCase();
 
-      // Priority 1: Exact match for rawPhrase (supports precise clause selection ending at a comma, semicolon, or period!)
+      // Priority 1: Exact match for rawPhrase (supports full multi-sentence paragraphs or precise clauses)
       let index = lowerNorm.indexOf(rawPhrase.toLowerCase());
       if (index !== -1) {
         return { start: index, end: index + rawPhrase.length };
       }
 
-      // Priority 2: If rawPhrase contains multiple full sentences, constrain to the first clause / sentence
+      // Priority 2: Match rawPhrase with normalized whitespace (handling linebreaks / spacing differences)
+      const cleanRawPhrase = rawPhrase.replace(/\s+/g, ' ');
+      const cleanNormText = lowerNorm.replace(/\s+/g, ' ');
+      const normIndex = cleanNormText.indexOf(cleanRawPhrase.toLowerCase());
+      if (normIndex !== -1) {
+        // Map back clean index to normalizedText index if possible
+        const prefix = cleanNormText.substring(0, normIndex);
+        const approxStart = prefix.length;
+        return { start: approxStart, end: Math.min(normalizedText.length, approxStart + rawPhrase.length) };
+      }
+
+      // Priority 3: First-sentence prefix fallback matching full rawPhrase length if applicable
       const firstSentenceMatch = rawPhrase.match(/^[^.!?]+[.!?]?/);
       const singleSentencePhrase = (firstSentenceMatch && firstSentenceMatch[0].trim()) ? firstSentenceMatch[0].trim() : rawPhrase;
 
       index = lowerNorm.indexOf(singleSentencePhrase.toLowerCase());
       if (index !== -1) {
-        return { start: index, end: index + singleSentencePhrase.length };
+        // If rawPhrase was longer, highlight up to rawPhrase.length if available
+        const targetLen = rawPhrase.length > singleSentencePhrase.length ? rawPhrase.length : singleSentencePhrase.length;
+        return { start: index, end: Math.min(normalizedText.length, index + targetLen) };
       }
 
-      // Priority 3: Substring / 4-word prefix match for the first sentence
+      // Priority 4: 4-word prefix match
       const cleanExcerpt = singleSentencePhrase.split(' ').slice(0, 4).join(' ');
       if (cleanExcerpt && cleanExcerpt.length > 5) {
         index = lowerNorm.indexOf(cleanExcerpt.toLowerCase());
         if (index !== -1) {
-          return { start: index, end: index + singleSentencePhrase.length };
+          const targetLen = rawPhrase.length > singleSentencePhrase.length ? rawPhrase.length : singleSentencePhrase.length;
+          return { start: index, end: Math.min(normalizedText.length, index + targetLen) };
         }
       }
     }
     
-    // Priority 4: Fallback if no exactPhrase match: constrain anchor to first sentence or clause
+    // Priority 5: Fallback if no exactPhrase match: use full anchor range if specified
     if (highlightRange && 'start' in highlightRange && 'end' in highlightRange) {
-      const start = highlightRange.start;
-      let end = highlightRange.end;
-      const textSub = normalizedText.substring(start, end);
-      const sentenceMatch = textSub.match(/^[^.!?]+[.!?]?/);
-      if (sentenceMatch && sentenceMatch[0].trim()) {
-        end = start + sentenceMatch[0].trim().length;
-      }
-      return { start, end };
+      return { start: highlightRange.start, end: highlightRange.end };
     }
 
     return highlightRange;

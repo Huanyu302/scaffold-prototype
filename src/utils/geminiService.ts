@@ -652,7 +652,10 @@ CRITICAL GUARDRAILS FOR SPECIFIC REAL-INTENT TITLES & DISCRETE EXCERPTS:
    - GOOD (REAL INTENT, 5 WORDS): "Missing Battery Kiosk Safety Features"
    - GOOD (REAL INTENT, 4 WORDS): "Unexplained Technical Acronyms (NIMBY/Peak-Shaving)"
 2. MANDATORY SEPARATION AT TRANSITIONS & DOMAIN SWITCHES: Whenever the instructor transitions to a new specific suggestion, requirement, or critique—especially after transitional markers like "Additionally", "Furthermore", "Moreover", "Also", "Second", "Besides", "Lastly", or when switching topic domain—you MUST extract it as a separate, distinct Key Point.
-3. HIGH-PRECISION "sourceExcerpt" BOUNDARIES: The "sourceExcerpt" for each Key Point MUST precisely cover ONLY the text of that specific suggestion. It MUST NOT bleed into adjacent distinct suggestions or transition phrases that belong to another Key Point.
+3. HIGH-PRECISION & NON-OVERLAPPING "sourceExcerpt" BOUNDARIES (CRITICAL):
+   - The "sourceExcerpt" for each Key Point MUST precisely cover ONLY the text of that specific suggestion. It MUST NOT bleed into adjacent distinct suggestions or transition phrases that belong to another Key Point.
+   - ABSOLUTE PROHIBITION ON OVERLAPPING: Every sentence or clause of the raw feedback text MUST belong to exactly ONE key point. You are STRICTLY FORBIDDEN from having the same sentence, sub-clause, or phrase appear in the "sourceExcerpt" of multiple cards. No character or word in the raw text should be shared by more than one card.
+   - CONCESSION/CONTRAST SENTENCE SPLITTING: If a single sentence contains both praise and suggestion (e.g., joined by "although", "but", "however", "yet"), you MUST split the sentence at the transition word. Put the praise part in a 'minor' (On Track) card and the suggestion/critique part (starting with "although", "but", etc.) in a 'moderate' (Suggestion) card. Their sourceExcerpts must be contiguous and non-overlapping.
 4. ZERO UNEXCERPTED GAPS & CHRONOLOGICAL ORDER: Every sentence/clause of instructor feedback MUST be covered by a key point's excerpt range, in exact top-to-bottom reading order, ensuring 100% text coverage without overlapping or skipping.
 5. EXACT VERBATIM COPIED TEXT: The "sourceExcerpt" MUST be copy-pasted verbatim directly from the raw feedback text without altering punctuation or words so frontend character offset anchoring highlights the entire passage seamlessly.
 
@@ -672,7 +675,7 @@ The JSON must strictly adhere to this TypeScript schema:
       "status": 'green' | 'yellow' | 'red' (The status indicator of this criterion),
       "isOfficialRubric": boolean (true if matching a whitelist criterion from the handbook, false if AI self-generalized)
     }>,
-    "globalSummary": string (A highly controlled, high-level summary paragraph comparing raw feedback against handbook rubrics. It MUST name the strongest area/strength and the weakest area/vulnerability of the student's project. It MUST NOT contain any micro-level details or specific revision instructions. It MUST consist of complete sentences ending with full stops, and its length MUST be strictly limited to 50 words or 2 sentences in total),
+    "globalSummary": string (A highly controlled, high-level summary overview. MUST consist of 2-3 short, crisp, independent sentences (10-15 words max per sentence). Each sentence delivers a single clear point: Sentence 1 states overall assessment & grade, Sentence 2 states primary strength, Sentence 3 states core area for refinement. Avoid convoluted compound clauses or overly long jammed sentences),
     "subScores": Array<{
       "dimension": string (The name of the sub-score criteria, dimension, or module extracted directly from the feedback text, e.g. "Problem Framing & Contextual Understanding"),
       "weight": string | null (The percentage weight of the criteria if specified in the feedback text, e.g., "40%". Set to null if not found),
@@ -693,7 +696,7 @@ CRITICAL RULES FOR EXECUTIVE OVERVIEW:
 1. DE-DUPLICATED MATHEMATICAL CLOSED LOOP: The rubricStatuses array in briefingOverview MUST contain exactly the de-duplicated union of all associatedCriterion strings present in the coreKeyPoints array. Every keypoint's associatedCriterion MUST have a corresponding RubricStatusItem in rubricStatuses with identical characters (strict case-sensitive match) so that every item has a matching top-level capsule tag.
 2. DATA INTEGRITY, NO GRADE CONVERSION HALLUCINATIONS: overallGrade and rubricStatuses statuses MUST be extracted 100% verbatim from the official feedback text or handbook. You are STRICTLY FORBIDDEN from converting numeric scores (e.g., "68", "68%", "75/100") into level names (such as "Merit", "Distinction", "Pass", "B"). If the raw feedback specifies "68", overallGrade MUST BE "68". Do NOT output "Merit" unless that exact word "Merit" explicitly appears in the input text! If no explicit grade or score exists, set overallGrade to "?".
 3. SUB-SCORES BREAKDOWN EXTRACTION: If the raw feedback text contains a breakdown of sub-scores, weights, or dimensions (e.g., "Problem Framing & Contextual Understanding (40%): Fail (<50). Aims, Objectives & Design Direction (25%): Fail (<50)."), you MUST extract them into the subScores array. Ensure that the extracted dimension names align with the handbook criteria if applicable. If no such section is found in the text, return an empty array [].
-4. GLOBAL SUMMARY LIMIT: The "globalSummary" MUST be strictly restricted to max 50 English words or 2 sentences. Only name the strongest (Strength) and weakest (Vulnerability) dimensions. Never include any detailed, micro-level revision or edit guidelines.
+4. GLOBAL SUMMARY FORMAT: The "globalSummary" MUST consist of 2-3 short, clear, scannable sentences. Avoid long compound sentences with complex subordinate clauses. Each sentence should deliver one clear insight concisely.
 5. STRICT KEYPOINT TITLE LIMIT (MAX 5 WORDS): The title of each extracted keypoint in coreKeyPoints MUST be strictly at most 5 words (1 to 5 words maximum, e.g. "Methodological Query Specification", "Thematic Literature Synthesis"). Never exceed 5 words under any circumstances.
 
 SEVERITY CLASSIFICATION & TOP-TO-BOTTOM ORDERING RULES:
@@ -1218,7 +1221,10 @@ Task: Cross-examine the instructor's remarks against these documents to ground y
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
-      systemInstruction: systemInstruction
+      systemInstruction: systemInstruction,
+      generationConfig: {
+        temperature: 0
+      }
     });
 
     const prompt = `Ingest and parse this instructor feedback text:\n\n${rawText}`;
@@ -1682,9 +1688,10 @@ COMPILATION & REASONING RULES:
 1. GRADE & CONTENT SUMMARY OVERVIEW (Professional Assessor & Career Coach Perspective):
    Write a cohesive, contextual "globalSummary" paragraph. You must analyze the text from the compound perspective of a "Senior Academic Assessor" and a "Career Competency Coach".
    - ABSOLUTE TEMPLATE PROHIBITION: You are strictly forbidden from using any boilerplates like "The tutor's feedback evaluates the submission...", "This feedback notes that...", "Overall, the assessment shows...", or similar.
-   - RIGID TWO-SENTENCE CORE INTENT STRUCTURE: The summary must consist of exactly 2 sentences and be strictly limited to 50-60 words total.
-     * Sentence 1 (The Anchor & Strength): Directly state the overall final grade (MUST match the extracted "grade" field exactly, e.g. if the grade is "A-", state "A-", do NOT invent or state a conflicting letter grade like "B+"), and immediately name the project's biggest asset / core strength in high-weight rubrics based strictly on the provided feedback text.
-     * Sentence 2 (The Vulnerability & Action): Point out the critical vulnerability/shortcoming that hurts the student's long-term portfolio/career asset value based strictly on the provided feedback text, and specify the exact action needed for improvement.
+   - CRISP SHORT-SENTENCE STRUCTURE: The summary MUST consist of 2-3 short, clear, independent sentences (max 10-15 words per sentence). Avoid wrapping multiple clauses, participle phrases, or long compound sentences together.
+     * Sentence 1 (Core Grade & Assessment): State the overall grade and overall quality directly in a short, clear sentence.
+     * Sentence 2 (Primary Strength): Name the single biggest asset/strength cleanly.
+     * Sentence 3 (Main Area for Improvement): Name the single most critical area for refinement directly.
    - STRICT ALIGNMENT & FAITHFULNESS GUARDRAILS:
      * GRADE ALIGNMENT: The grade mentioned in "globalSummary" MUST be 100% consistent with the "grade" field and "subScores" breakdown (e.g. if the grade is "A-", globalSummary must say "A-"). NEVER state a different grade (such as "B+") in globalSummary.
      * FACTUAL GROUNDING: Do NOT invent hypothetical project details or generic topics (such as "comparative impact indicators" or "dense technical jargon") if they do not appear in the raw feedback text. Base every strength and weakness claim 100% on the extracted feedback points.
@@ -1699,27 +1706,53 @@ COMPILATION & REASONING RULES:
      * TIER 2 (COURSE HANDBOOK REGIONAL MATCHING - NO LAZY FIRST TABLE): If NO subScores exist in the feedback text, scan the COURSE HANDBOOK CONTEXT for the official Rubric table corresponding to THIS specific evaluation phase:
        - MANDATE AGAINST LAZY FIRST-TABLE PICKING: DO NOT subconsciously or lazily read the first table encountered in the document! PDF handbooks often place the Interim/Formative table on early pages. You MUST scan section/chapter headings first to locate the specific section for 'Summative Assessment', 'Final Evaluation', 'Final Portfolio', or 'End-of-Term Assessment'. Only extract criteria from the rubric table situated INSIDE that Final/Summative section! You are STRICTLY FORBIDDEN from extracting criteria from 'Formative', 'Interim', 'Draft', or 'Mid-term' rubric tables when parsing a Summative evaluation!
        - CRITERIA EXTRACTION (VERBATIM CORE WORDS ONLY): Once the Summative/Final rubric table is located, extract the criterion titles from its 'Criteria' column. You MUST use the VERBATIM original wording or exact words extracted directly from the original phrase. ABSOLUTE PROHIBITION: You are STRICTLY FORBIDDEN from performing synonym replacements, semantic paraphrasing, or inventing external summary terms (e.g. do NOT substitute 'Problem Definition' with 'Problem Framing' if the text says 'Problem Definition'). Strip any "(ILO1)", "(ILO2)" or ILO numbers, convert "and" to "&", and preserve the original wording. Do NOT include page numbers or source metadata.
-   - VERBATIM ORIGINAL WORDS RULE: Strip any "(ILO1)", "(ILO2)" or LO numbers. Convert "and" to "&". Use verbatim words from the original criteria phrase. Do NOT replace with synonyms.
-   Categorize every strength and area for improvement observation extracted from the feedback text:
-   - OFFICIAL RUBRIC TRACK (isOfficialRubric = true): If the remark aligns with handbook criteria or subScores dimensions, set "associatedCriterion" to that exact taxonomy tag and set "isOfficialRubric" to true.
-   - AI SELF-GENERALIZED TRACK (isOfficialRubric = false): If the remark discusses additional qualitative aspects, qualitatively summarize a short taxonomy tag (e.g. "Writing Style", "Presentation Format") and set "isOfficialRubric" to false.
 
-4. STRENGTHS & WEAKNESSES (Exhaustive Full-Text Extraction & Multi-Evidence Anchoring Rules):
-   - CRITICAL EXHAUSTIVE EXTRACTION (NO OMISSIONS):
-     * EXHAUSTIVE FULL-TEXT EXTRACTION: You MUST perform an exhaustive extraction of originalFeedbackText from top to bottom. Every qualitative feedback sentence, remark, or observation in the narrative text MUST yield a corresponding entry in keyStrengths (if praising) or areasForImprovement (if critique). You are STRICTLY FORBIDDEN from skipping, ignoring, or omitting any qualitative paragraph or sentence.
-     * NO UNBALANCED OMISSION: If a tutor paragraph contains 3 distinct feedback points, output 3 distinct items in your JSON array.
-     * MERGED EVIDENCE FULL-SPAN HIGHLIGHTING (CRITICAL): If you decide to group or merge multiple related evidence sentences into a single combined observation card, your "exactPhrase" field MUST contain the COMPLETE, UN-TRUNCATED, VERBATIM combined passage of ALL evidence sentences (from the start of the first sentence to the end of the last evidence sentence). Your "anchor" { "start", "end" } MUST cover the full range of all combined evidence sentences so that 100% of the underlying evidence is highlighted on the UI, rather than highlighting only a single sentence or fragment.
-     * DO NOT MERGE UNRELATED POINTS: Do NOT group or merge independent feedback points/sentences that discuss different topics, even if they appear in the same paragraph. Extract all independent points fully so that full-text coverage is 100% preserved.
-   - SCORE BREAKDOWN STRIPPING: You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)", grade descriptions, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
-   - FEEDBACK NARRATIVE SANDBOXING: You must lock your qualitative analysis sandbox strictly to the free-text prose commentary (e.g. general feedback or descriptive review paragraphs).
-   - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise passage), and anchor coordinates { start, end } representing the precise character offset range of the praise passage inside originalFeedbackText.
-   - AREAS FOR IMPROVEMENT (areasForImprovement): Extract specific qualitative critiques or improvements. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the critique clearly from a weakness/deficit perspective (e.g. "ToC Causal Linkage & Input Gaps"), issueHighlight (micro-distillation of the issue passage), and anchor coordinates { start, end } representing the precise character offset range of the critique passage.
+4. SEMANTIC OBSERVATIONS EXTRACTION & COMPLETE ANCHORING RULES:
+    - SEMANTIC KEY POINT EXTRACTION & HIGH-FIDELITY ANCHORING (CRITICAL):
+       * You MUST extract and anchor key points based strictly on the specific qualitative findings/comments. Do NOT force-merge unrelated comments just because they reside in the same paragraph or share the same tone.
+       * MULTIPLE KEY POINTS PER PARAGRAPH (CRITICAL): If a single paragraph contains multiple distinct observations, qualitative points, or tools under discussion (even if they all share the same tone, such as all being critiques or all being strengths), you MUST extract them as separate, independent cards.
+       * Your "exactPhrase" field MUST contain the COMPLETE, UN-TRUNCATED, VERBATIM passage of all sentences that directly support the identified key point (including any concrete examples and explanation sentences for that specific point).
+       * Your "anchor" { "start", "end" } MUST cover precisely the span of these related sentences. Do NOT stretch the anchor to cover the entire paragraph if the paragraph contains other unrelated comments or sentences.
+    - EXHAUSTIVE PARSING & NO OMISSION DIRECTIVE (CRITICAL):
+      * You MUST read and analyze the entire feedback text from top to bottom. Avoid skipping or ignoring important qualitative paragraphs or sentences.
+      * UNIVERSAL CONTRAST-SPLITTING ALGORITHM (ABSOLUTE MANDATE FOR ALL MATERIALS):
+         You MUST apply this step-by-step parsing algorithm to every single paragraph in the feedback text:
+         1. SCAN: Analyze the paragraph sentence-by-sentence.
+         2. DETECT TRANSITION: Identify if there is a contrast transition sentence starting with or led by transition words (e.g., "However,", "but", "yet", "although", "whereas", "on the other hand", "; however,").
+         3. SPLIT: If a transition is detected, you MUST split the paragraph at that transition point into exactly two contiguous parts:
+            - Part A (Praise Part): From the first character of the paragraph to the character immediately before the transition word. Classify this verbatim chunk under "keyStrengths".
+            - Part B (Critique Part): From the transition word to the last character/period of the paragraph (including all subsequent supporting explanations, examples, or requirements in that paragraph). Classify this verbatim chunk under "areasForImprovement".
+         4. NO NESTED EXTRACTION (ABSOLUTE PROHIBITION ON OVERLAPPING): You are STRICTLY FORBIDDEN from performing nested extraction or creating overlapping anchors. Once Part B (Critique Part) is partitioned, you MUST treat it as a single, unified critique block. You MUST NOT extract any sub-clauses or sentences within Part B (such as praise clauses inside concession sentences, e.g., "While minimising investment risk is smart" in "While minimising investment risk is smart, you also need to ensure...") as a separate "keyStrengths" card. Extracting overlapping segments of text into multiple cards will break the frontend highlighting. Part A and Part B must be completely non-overlapping and contiguous.
+         5. NO OMISSION: You MUST output BOTH Part A and Part B as separate cards. You are STRICTLY FORBIDDEN from omitting either part.
+       * GENERALIZED CONTRAST-SPLITTING PATTERN & SCHEMA MAPPING (UNIVERSAL TEMPLATE):
+         - Abstract Input Paragraph: "[Praise statement about Tool X]. [Transition word (e.g., However/But/Yet)], [critique statement about Tool X shortcoming]. [Supporting example or instruction sentence containing a concession clause, e.g., 'While doing Y is good, you must do Z']."
+         - Expected Output Cards:
+           1. In "keyStrengths" (Praise Part):
+              * "title": "[Condense Praise Statement to 2-5 words]"
+              * "exactPhrase": "[Praise statement about Tool X]."
+              * "anchor": { "start": <start of paragraph>, "end": <index before transition> }
+           2. In "areasForImprovement" (Critique Part):
+              * "title": "[Condense Shortcoming to 2-5 words]"
+              * "exactPhrase": "[Transition word (e.g., However/But/Yet)], [critique statement about Tool X]. [Supporting example or instruction sentence containing a concession clause, e.g., 'While doing Y is good, you must do Z']."
+              * "anchor": { "start": <index of transition>, "end": <end of paragraph> }
+         - Every contrast paragraph in ANY feedback text MUST be partitioned into exactly two adjacent, non-overlapping cards matching this structural template. Under no circumstances should the concession clause ('While doing Y is good') be re-extracted into keyStrengths.
+       * TOPIC-SHIFT SEGMENTATION (ABSOLUTE MANDATE): If a single paragraph transitions from discussing one tool, artifact, or evaluation theme to another (e.g., from "Theory of Change (ToC)" or "stakeholders" to a "comparison chart", or from "indicator development" to "calculations"), you MUST split the paragraph at that transition point and generate separate, independent cards. NEVER merge discussions of different artifacts or tools into a single card, even if they share the same tone or reside in the same paragraph.
+    - ACCURATE SEMANTIC CLASSIFICATION:
+      * Accurately determine the type/category (keyStrengths vs areasForImprovement) based on the semantic tone of the block.
+      * For contrast paragraphs, split at the transition word (e.g., "However,", "; however,", "but") into two contiguous sub-blocks: classify the praise sub-block as keyStrengths and the critique sub-block as areasForImprovement. Ensure their exactPhrase fields match their respective halves of the split paragraph verbatim.
+    - CHRONOLOGICAL & STRUCTURAL ORDERING:
+      * You MUST output the cards in both keyStrengths and areasForImprovement in the exact order they appear in the original text (chronological sequence of writing).
+    - SCORE BREAKDOWN & HEADER STRIPPING (CRITICAL):
+      * You must scan the feedback text, identify all structured grade breakdown rows (e.g. lines with weights like "(40%)", grade descriptions, and scores like "(60-70)"), and completely exclude them from the key strengths and areas for improvement analysis. Never extract overall dimension headers as key findings.
+      * SECTION HEADINGS STRIPPING: Identify and completely exclude all standalone section/criterion headings, titles, or labels (e.g. "ToC and Concept Comparison", "Indicators and Calculations", "Organisational Context and SDG Goal", "Evaluation Details"). You are STRICTLY FORBIDDEN from treating headings as qualitative feedback comments or generating cards for them. Only extract from actual narrative prose paragraphs.
+    - FEEDBACK NARRATIVE SANDBOXING: You must lock your qualitative analysis sandbox strictly to the free-text prose commentary (e.g. general feedback or descriptive review paragraphs).
+    - KEY STRENGTHS (keyStrengths): Extract specific qualitative remarks praising the student's work from the narrative body. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the strength clearly from an evaluative perspective (e.g. "Thorough Conceptual Framework Design"), praiseHighlight (a micro-distillation of the praise passage), and anchor coordinates { start, end } representing the precise character offset range of the praise passage inside originalFeedbackText.
+    - AREAS FOR IMPROVEMENT (areasForImprovement): Extract specific qualitative critiques or improvements. Provide a precise, unique, high-fidelity descriptive title in title-case summarizing the critique clearly from a weakness/deficit perspective (e.g. "ToC Causal Linkage & Input Gaps"), issueHighlight (micro-distillation of the issue passage), and anchor coordinates { start, end } representing the precise character offset range of the critique passage.
 
-   - OBSERVATION TITLE SPECIFICATION (CRITICAL FOR ACCURACY & DE-DUPLICATION):
-     * EVALUATIVE STYLE (STRENGTH / WEAKNESS PERSPECTIVE): Write titles from a performance feedback perspective describing the presence of an asset or deficit.
-     * NO GENERIC CATEGORY TAGS: Avoid short generic tags. Each card's title MUST be a precise, context-rich, and unique summary of the thematic feedback observation.
-     * STRICT TITLE WORD LIMIT (MAX 5 WORDS): Each title in keyStrengths and areasForImprovement MUST be strictly limited to AT MOST 5 WORDS (1 to 5 words maximum, e.g., "Robust Conceptual Design", "Unclear Scoring Rationale"). Never exceed 5 words under any circumstances.
-     * SUB-CLAUSE GRANULAR ANCHORING (TRANSITIONAL & CONTRAST SENTENCES): When a feedback sentence contains contrasting clauses (e.g., starting with "While...", "Although...", or containing ", but...", ", however..."), split at the contrast boundary so praise goes to keyStrengths and critique goes to areasForImprovement. Never assign overlapping start and end anchor ranges to separate items!
+    - OBSERVATION TITLE SPECIFICATION (CRITICAL FOR ACCURACY & DE-DUPLICATION):
+      * EVALUATIVE STYLE (STRENGTH / WEAKNESS PERSPECTIVE): Write titles from a performance feedback perspective describing the presence of an asset or deficit.
+      * NO GENERIC CATEGORY TAGS: Avoid short generic tags. Each card's title MUST be a precise, context-rich, and unique summary of the thematic feedback observation.
+      * STRICT TITLE WORD LIMIT (MAX 5 WORDS): Each title in keyStrengths and areasForImprovement MUST be strictly limited to AT MOST 5 WORDS (1 to 5 words maximum, e.g., "Robust Conceptual Design", "Unclear Scoring Rationale"). Never exceed 5 words under any circumstances.
 
 The JSON object must strictly adhere to this TypeScript schema:
 {
@@ -1737,7 +1770,7 @@ The JSON object must strictly adhere to this TypeScript schema:
     "associatedCriterion": string (Short 2-4 word abstract taxonomy tag, e.g., "Problem Framing", "User Research", "Scenarios & Tasks"),
     "isOfficialRubric": boolean (true if matching official handbook rubric, false if AI self-generalized),
     "praiseHighlight": string (micro-distillation of praise sentence),
-    "exactPhrase": string (the complete, un-truncated, punctuation-terminated sentence matching the original feedback verbatim),
+    "exactPhrase": string (the complete, un-truncated, full verbatim passage or multi-sentence paragraph matching the original feedback text from start to end),
     "anchor": { "start": number, "end": number }
   }>,
   "areasForImprovement": Array<{
@@ -1746,7 +1779,7 @@ The JSON object must strictly adhere to this TypeScript schema:
     "associatedCriterion": string (Short 2-4 word abstract taxonomy tag, e.g., "Problem Framing", "User Research", "Scenarios & Tasks"),
     "isOfficialRubric": boolean (true if matching official handbook rubric, false if AI self-generalized),
     "issueHighlight": string (micro-distillation of issue sentence),
-    "exactPhrase": string (the complete, un-truncated, punctuation-terminated sentence matching the original feedback verbatim),
+    "exactPhrase": string (the complete, un-truncated, full verbatim passage or multi-sentence paragraph matching the original feedback text from start to end),
     "anchor": { "start": number, "end": number }
   }>,
   "nextSteps": {
@@ -1846,7 +1879,7 @@ export const alignGlobalSummaryWithGrade = (summary: string, grade?: string | nu
   if (!summary) return '';
 
   const cleanGrade = (grade && grade !== '?') ? grade.trim() : '';
-  const gradePatternStr = `(?:[A-F][+-]?|Pass|Fail|Distinction|Merit|<\\d+|>\\d+|\\d+%)`;
+  const gradePatternStr = `(?:[A-F][+-]?|Pass|Fail|Distinction|Merit|\\?|<\\d+|>\\d+|\\d+%)`;
 
   if (cleanGrade) {
     const article = /^[aeiou]/i.test(cleanGrade) ? 'an' : 'a';
@@ -1939,26 +1972,58 @@ export const generateMockSummativeParsedResponse = (
       }
     }
 
-    // Check if this line is a header (no punctuation at the end of the line and relatively short)
-    const isHeader = trimmedLine.length < 50 && !/[.!?]$/.test(trimmedLine) && (trimmedLine.toLowerCase().includes('indicator') || trimmedLine.toLowerCase().includes('calculation') || trimmedLine.endsWith(':'));
+    // Check if this line is a header (no punctuation at the end of the line and relatively short, or matches section headings)
+    const hasPunctuation = /[.!?]$/.test(trimmedLine);
+    const isHeader = trimmedLine.length < 65 && !hasPunctuation && 
+                     (!/^(you|your|i |this|these|the |an |a )/i.test(trimmedLine) || 
+                      trimmedLine.toLowerCase().includes('comparison') ||
+                      trimmedLine.toLowerCase().includes('context') ||
+                      trimmedLine.toLowerCase().includes('calculation') ||
+                      trimmedLine.toLowerCase().includes('indicators') ||
+                      trimmedLine.toLowerCase().includes('thinking') ||
+                      trimmedLine.toLowerCase().includes('assessment') ||
+                      trimmedLine.toLowerCase().includes('writing') ||
+                      trimmedLine.toLowerCase().includes('discipline') ||
+                      trimmedLine.toLowerCase().includes('rigor') ||
+                      trimmedLine.toLowerCase().includes('synthesis') ||
+                      trimmedLine.endsWith(':'));
     if (isHeader) return;
 
-    // Split line into sentences
+    // Split paragraph line into sentences
     const rawSentences = trimmedLine.match(/[^.!?]+[.!?]*/g) || [trimmedLine];
     const sentences: string[] = [];
 
     rawSentences.forEach((s) => {
       const trimmedS = s.trim();
       if (!trimmedS) return;
-
-      // Check for compound transitional contrast splitting (e.g. "While X, Y." or "X, but Y.")
-      const clauses = splitCompoundSentence(trimmedS);
-      clauses.forEach(c => sentences.push(c));
+      sentences.push(trimmedS);
     });
 
-    sentences.forEach((sentence) => {
-      const trimmed = sentence.trim();
-      if (trimmed.length < 6) return;
+    // Group sentences into semantic blocks within the paragraph
+    // If a sentence starts with transition contrast words ("however", "but", "yet", "although", "though"),
+    // OR starts with a topic shift keyword (e.g. "the comparison chart", "your toc", "the toc", "theory of change", "your impact indicators", "in your interventions"), start a new block.
+    // Otherwise, append to current block to merge them and highlight the entire discussion region.
+    const blocks: string[] = [];
+    let currentBlock = '';
+
+    sentences.forEach((s) => {
+      const startsNewBlock = /^(however|but|yet|although|though|nevertheless|nonetheless)/i.test(s) ||
+                             /^(the comparison chart|comparison chart|your toc|the toc|theory of change|in your interventions|your impact indicators|development of indicators|your back-of-the-envelope|indicators and calculations)/i.test(s);
+      if (startsNewBlock && currentBlock.length > 0) {
+        blocks.push(currentBlock.trim());
+        currentBlock = s;
+      } else {
+        currentBlock = currentBlock ? currentBlock + ' ' + s : s;
+      }
+    });
+    if (currentBlock.trim()) {
+      blocks.push(currentBlock.trim());
+    }
+
+    // Process each merged block as a single thematic key point
+    blocks.forEach((blockText) => {
+      const trimmed = blockText.trim();
+      if (trimmed.length < 10) return;
 
       const lower = trimmed.toLowerCase();
       
@@ -2009,7 +2074,9 @@ export const generateMockSummativeParsedResponse = (
 
       let title = generateTitleFromSentence(trimmed);
 
-      if (isBad && !isGood) {
+      const isConstructive = ['however', 'but', 'brief', 'depth', 'could', 'ensure', 'consider', 'make', 'improve', 'recommend', 'suggest', 'discuss', 'introduce', 'earlier', 'helpful'].some(w => lower.includes(w)) || /^(however|but|should|could|would)/i.test(trimmed);
+
+      if (isBad || isConstructive) {
         areasForImprovement.push({
           id: `improvement-${improvementCount++}`,
           title,
@@ -2019,7 +2086,7 @@ export const generateMockSummativeParsedResponse = (
           isOfficialRubric: Boolean(currentCriterion),
           anchor: { start: startOffset, end: endOffset }
         });
-      } else if (isGood && !isBad) {
+      } else {
         keyStrengths.push({
           id: `strength-${strengthCount++}`,
           title,
@@ -2029,29 +2096,6 @@ export const generateMockSummativeParsedResponse = (
           isOfficialRubric: Boolean(currentCriterion),
           anchor: { start: startOffset, end: endOffset }
         });
-      } else {
-        const isConstructive = ['however', 'but', 'brief', 'depth', 'could', 'ensure', 'consider', 'make', 'improve', 'recommend', 'suggest', 'discuss', 'introduce', 'earlier', 'helpful'].some(w => lower.includes(w));
-        if (isConstructive) {
-          areasForImprovement.push({
-            id: `improvement-${improvementCount++}`,
-            title,
-            issueHighlight: trimmed,
-            exactPhrase: trimmed,
-            associatedCriterion: currentCriterion || undefined,
-            isOfficialRubric: Boolean(currentCriterion),
-            anchor: { start: startOffset, end: endOffset }
-          });
-        } else {
-          keyStrengths.push({
-            id: `strength-${strengthCount++}`,
-            title,
-            praiseHighlight: trimmed,
-            exactPhrase: trimmed,
-            associatedCriterion: currentCriterion || undefined,
-            isOfficialRubric: Boolean(currentCriterion),
-            anchor: { start: startOffset, end: endOffset }
-          });
-        }
       }
     });
   });
@@ -2139,9 +2183,13 @@ export const generateMockSummativeParsedResponse = (
   const topWeaknessName = areasForImprovement[0]?.title || (firstBadScore ? firstBadScore.dimension : 'literature synthesis transitions');
 
   const articleStr = effectiveGrade ? (/^[aeiou]/i.test(effectiveGrade) ? 'an' : 'a') : '';
-  const summaryPrefix = effectiveGrade ? `Securing ${articleStr} ${effectiveGrade} grade for its ${topStrengthName.toLowerCase()}` : `Demonstrating commendable analytical foundation in ${topStrengthName.toLowerCase()}`;
-  
-  const rawSummary = `${summaryPrefix}, this project shows strong academic potential. However, long-term impact is constrained by ${topWeaknessName.toLowerCase()}, requiring targeted refinement in future work.`;
+  const s1 = effectiveGrade
+    ? `This submission achieves ${articleStr} ${effectiveGrade} grade overall.`
+    : `This submission demonstrates a solid analytical foundation overall.`;
+  const s2 = `The main strength lies in ${topStrengthName.toLowerCase()}.`;
+  const s3 = `The primary area for refinement is ${topWeaknessName.toLowerCase()}.`;
+
+  const rawSummary = `${s1} ${s2} ${s3}`;
   
   const globalSummary = alignGlobalSummaryWithGrade(rawSummary, effectiveGrade);
 
@@ -2272,7 +2320,10 @@ export const processSummativeFeedback = async (
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
-      systemInstruction: SUMMATIVE_PARSER_SYSTEM_INSTRUCTION
+      systemInstruction: SUMMATIVE_PARSER_SYSTEM_INSTRUCTION,
+      generationConfig: {
+        temperature: 0
+      }
     });
 
     let prompt = `Ingest and parse this final tutor feedback text into the requested structured JSON schema:\n\n${rawText}`;
